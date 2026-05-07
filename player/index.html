@@ -227,49 +227,63 @@ function showLoading() {
   document.getElementById('state-loading').style.display = 'flex';
 }
 
-// Nominatim 反查省市（免费，无需 Key）
+// ── 地名反查（带本地缓存，避免重复请求）────────────
+const GEO_CACHE_KEY = 'hsg_nickname';
+const GEO_CACHE_TS  = 'hsg_nickname_ts';
+const GEO_CACHE_TTL = 6 * 3600 * 1000; // 6小时内复用缓存
+
 async function geocode(lat, lng) {
+  // 优先读缓存（同一人在同一区域无需重复请求）
+  const cached = localStorage.getItem(GEO_CACHE_KEY);
+  const cachedTs = Number(localStorage.getItem(GEO_CACHE_TS) || 0);
+  if (cached && Date.now() - cachedTs < GEO_CACHE_TTL) return cached;
+
   try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000); // 4秒超时
     const r = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=zh-CN&zoom=10`,
-      { headers: { 'Accept-Language': 'zh-CN' } }
+      { headers: { 'Accept-Language': 'zh-CN' }, signal: ctrl.signal }
     );
+    clearTimeout(timer);
     const d = await r.json();
     const a = d.address || {};
     const DIRECT = ['北京','上海','天津','重庆'];
     let prov = (a.province || a.state || '').replace(/省$|自治区$|特别行政区$/, '');
     let city = (a.city || a.county || a.district || a.town || '').replace(/市$|区$|县$|州$/, '');
+    let name;
     if (DIRECT.includes(prov)) {
       const dist = (a.district || a.suburb || '').replace(/区$|县$/, '');
-      return dist ? prov + dist : prov;
+      name = dist ? prov + dist : prov;
+    } else {
+      name = (prov && city && prov !== city) ? prov + city : (prov || city || null);
     }
-    if (prov && city && prov !== city) return prov + city;
-    return prov || city || null;
+    if (name) {
+      localStorage.setItem(GEO_CACHE_KEY, name);
+      localStorage.setItem(GEO_CACHE_TS, String(Date.now()));
+    }
+    return name;
   } catch { return null; }
 }
 
-// 上报位置到 Supabase
-async function report(pid, nickname, lat, lng, accuracy) {
+// ── 上报位置（fire-and-forget，不阻塞UI）───────────
+function report(pid, nickname, lat, lng, accuracy) {
   const now = new Date().toISOString();
-
-  // upsert 当前位置（实时表）
-  await db.from('players').upsert({
+  // 两个请求并行发出，不 await
+  db.from('players').upsert({
     id: pid, nickname, lat, lng,
     accuracy: Math.round(accuracy),
-    online: true,
-    updated_at: now
+    online: true, updated_at: now
   }, { onConflict: 'id' });
-
-  // 写入历史记录
-  await db.from('location_history').insert({
+  db.from('location_history').insert({
     player_id: pid, nickname, lat, lng,
-    accuracy: Math.round(accuracy),
-    recorded_at: now
+    accuracy: Math.round(accuracy), recorded_at: now
   });
 }
 
-// 主流程
+// ── 主流程（极速版）──────────────────────────────
 let watchId = null;
+
 async function init() {
   showLoading();
 
@@ -278,51 +292,101 @@ async function init() {
     return;
   }
 
-  // 获取一次性位置
+  const pid = getPid();
+
+  // 读取缓存昵称（如果有，地名反查可完全后台进行）
+  const cachedNick = localStorage.getItem(GEO_CACHE_KEY);
+  const cachedTs   = Number(localStorage.getItem(GEO_CACHE_TS) || 0);
+  const nickReady  = cachedNick && (Date.now() - cachedTs < GEO_CACHE_TTL);
+
+  // Step 1：低精度快速定位（允许30秒内缓存坐标，几乎瞬间返回）
+  let fastPos = null;
+  try {
+    fastPos = await new Promise((ok, fail) =>
+      navigator.geolocation.getCurrentPosition(ok, fail, {
+        enableHighAccuracy: false, // 低精度，速度快
+        timeout: 5000,
+        maximumAge: 30000          // 允许用30秒内的缓存坐标
+      })
+    );
+  } catch { /* 低精度失败，继续尝试高精度 */ }
+
+  if (fastPos) {
+    const { latitude: lat, longitude: lng, accuracy } = fastPos.coords;
+
+    if (nickReady) {
+      // 有缓存昵称 → 立即上报 + 立即显示成功（最快路径，<1秒）
+      report(pid, cachedNick, lat, lng, accuracy);
+      showSuccess();
+      // 后台异步补高精度 + 更新昵称
+      upgradeLocation(pid, cachedNick, lat, lng);
+      return;
+    } else {
+      // 无缓存昵称 → 上报占位昵称先显示成功，地名后台反查后更新
+      const tmpNick = '玩家' + Math.floor(Math.random() * 9000 + 1000);
+      report(pid, tmpNick, lat, lng, accuracy);
+      showSuccess(); // 立即显示成功，不等地名
+      // 后台并行：反查地名 + 高精度定位
+      geocode(lat, lng).then(name => {
+        const realNick = name || tmpNick;
+        if (name) report(pid, realNick, lat, lng, accuracy); // 用真实昵称更新一次
+        upgradeLocation(pid, realNick, lat, lng);
+      });
+      return;
+    }
+  }
+
+  // Step 2：低精度也失败，回退到高精度（最多等8秒）
   let pos;
   try {
     pos = await new Promise((ok, fail) =>
       navigator.geolocation.getCurrentPosition(ok, fail, {
-        enableHighAccuracy: true, timeout: 15000, maximumAge: 0
+        enableHighAccuracy: true, timeout: 8000, maximumAge: 0
       })
     );
   } catch(e) {
-    const m = { 1:'你拒绝了位置授权，请在浏览器设置中开启后重试。', 2:'GPS 无法获取位置，请在户外或信号好的地方重试。', 3:'定位超时，请重试。' };
+    const m = {
+      1: '你拒绝了位置授权，请在浏览器设置中开启后重试。',
+      2: 'GPS 无法获取位置，请在户外或信号好的地方重试。',
+      3: '定位超时，请重试。'
+    };
     showError(m[e.code] || '位置获取失败，请重试。');
     return;
   }
 
   const { latitude: lat, longitude: lng, accuracy } = pos.coords;
-  const pid = getPid();
+  const nickname = nickReady ? cachedNick : (await geocode(lat, lng) || '玩家' + Math.floor(Math.random() * 9000 + 1000));
+  report(pid, nickname, lat, lng, accuracy);
+  showSuccess();
+  upgradeLocation(pid, nickname, lat, lng);
+}
 
-  // 反查地名（后台静默）
-  let nickname = await geocode(lat, lng);
-  if (!nickname) nickname = '玩家' + Math.floor(Math.random() * 9000 + 1000);
-
-  // 上报
-  await report(pid, nickname, lat, lng, accuracy);
-
-  // 持续追踪（每 15 秒上报一次）
+// 后台高精度追踪（不阻塞UI）
+function upgradeLocation(pid, nickname, initLat, initLng) {
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+
+  // 先尝试拿一次高精度坐标
+  navigator.geolocation.getCurrentPosition(
+    p => report(pid, nickname, p.coords.latitude, p.coords.longitude, p.coords.accuracy),
+    null,
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+  );
+
+  // 持续追踪
   watchId = navigator.geolocation.watchPosition(
     p => report(pid, nickname, p.coords.latitude, p.coords.longitude, p.coords.accuracy),
     null,
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 8000 }
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
   );
 
-  // 页面关闭时标记离线
   window.addEventListener('beforeunload', () => {
     navigator.geolocation.clearWatch(watchId);
-    // 用 sendBeacon 保证发出去
-    const payload = JSON.stringify([{ id: pid, online: false, updated_at: new Date().toISOString() }]);
     navigator.sendBeacon(
       `${SUPABASE_URL}/rest/v1/players?id=eq.${pid}`,
-      new Blob([payload], { type: 'application/json' })
+      new Blob([JSON.stringify([{ id: pid, online: false, updated_at: new Date().toISOString() }])],
+        { type: 'application/json' })
     );
-  });
-
-  // 全部完成才显示成功
-  showSuccess();
+  }, { once: true });
 }
 
 window.addEventListener('DOMContentLoaded', init);
