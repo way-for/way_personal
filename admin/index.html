@@ -343,6 +343,107 @@
       margin-top:1rem; min-height:1.2em;
     }
 
+    /* ── 轨迹回放面板 ── */
+    #replay-panel {
+      display:none; position:absolute; inset:0; z-index:501;
+      flex-direction:column; background:transparent; pointer-events:none;
+    }
+    #replay-panel.show { display:flex; }
+
+    /* 回放控制条（底部固定）*/
+    .replay-bar {
+      position:absolute; bottom:0; left:0; right:0;
+      background:var(--panel);
+      border-top:1px solid var(--border);
+      border-radius:14px 14px 0 0;
+      padding:.85rem 1rem;
+      pointer-events:all;
+      box-shadow:0 -4px 20px rgba(0,0,0,.4);
+    }
+
+    .replay-header {
+      display:flex; align-items:center; gap:8px;
+      margin-bottom:.65rem;
+    }
+    .replay-title { font-size:.85rem; font-weight:700; flex:1; }
+    .replay-player-name {
+      font-size:.75rem; color:var(--accent);
+      background:rgba(124,106,247,.12);
+      padding:2px 10px; border-radius:6px;
+    }
+    .replay-close {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:7px; padding:3px 10px;
+      color:var(--text); font-size:.72rem; cursor:pointer;
+      font-family:inherit;
+    }
+
+    /* 进度条 */
+    .replay-progress-wrap {
+      position:relative; height:6px;
+      background:var(--border); border-radius:3px;
+      margin-bottom:.65rem; cursor:pointer;
+    }
+    .replay-progress-fill {
+      height:100%; border-radius:3px;
+      background:linear-gradient(90deg,var(--accent),var(--accent2));
+      transition:width .1s;
+      pointer-events:none;
+    }
+    .replay-progress-thumb {
+      position:absolute; top:50%; transform:translate(-50%,-50%);
+      width:14px; height:14px; border-radius:50%;
+      background:white; box-shadow:0 1px 4px rgba(0,0,0,.4);
+      pointer-events:none;
+    }
+
+    /* 控制按钮行 */
+    .replay-controls {
+      display:flex; align-items:center; gap:8px;
+    }
+    .replay-btn {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:8px; padding:.4rem .75rem;
+      color:var(--text); font-size:.78rem; cursor:pointer;
+      font-family:inherit; transition:all .15s;
+    }
+    .replay-btn:hover { background:rgba(124,106,247,.15); border-color:var(--accent); }
+    .replay-btn.active { background:rgba(124,106,247,.2); border-color:var(--accent); color:var(--accent); }
+
+    .replay-time {
+      font-size:.75rem; color:var(--muted);
+      font-family:monospace; margin-left:auto;
+    }
+
+    .replay-speed {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:8px; padding:.4rem .6rem;
+      color:var(--text); font-size:.72rem; cursor:pointer;
+      font-family:inherit;
+    }
+
+    /* 轨迹点信息浮窗 */
+    .replay-step-info {
+      position:absolute; top:12px; left:12px;
+      background:rgba(22,27,34,.92);
+      border:1px solid var(--border);
+      border-radius:10px; padding:.6rem .85rem;
+      font-size:.75rem; pointer-events:none;
+      z-index:10;
+    }
+    .replay-step-info b { color:var(--accent); }
+
+    /* 历史面板增加回放按钮 */
+    .replay-launch-btn {
+      background:rgba(124,106,247,.15);
+      border:1px solid rgba(124,106,247,.3);
+      border-radius:7px; padding:3px 10px;
+      color:var(--accent); font-size:.7rem;
+      cursor:pointer; font-family:inherit;
+      transition:all .15s; white-space:nowrap;
+    }
+    .replay-launch-btn:hover { background:rgba(124,106,247,.3); }
+
   </style>
 </head>
 <body>
@@ -439,6 +540,43 @@
     </div>
   </div>
 </div>
+
+  <!-- ── 轨迹回放面板 ── -->
+  <div id="replay-panel">
+    <div class="replay-step-info" id="replay-info" style="display:none;">
+      <b id="ri-name">--</b><br>
+      <span id="ri-time" style="color:var(--muted);">--</span><br>
+      <span id="ri-coord" style="font-family:monospace;font-size:.68rem;color:var(--accent);">--</span><br>
+      <span id="ri-acc" style="color:var(--muted);font-size:.68rem;">--</span>
+    </div>
+    <div class="replay-bar">
+      <div class="replay-header">
+        <span>🎬</span>
+        <span class="replay-title">轨迹回放</span>
+        <span class="replay-player-name" id="replay-pname">--</span>
+        <button class="replay-close" onclick="closeReplay()">✕ 关闭</button>
+      </div>
+
+      <div class="replay-progress-wrap" id="replay-prog-wrap" onclick="replaySeek(event)">
+        <div class="replay-progress-fill" id="replay-prog-fill" style="width:0%"></div>
+        <div class="replay-progress-thumb" id="replay-prog-thumb" style="left:0%"></div>
+      </div>
+
+      <div class="replay-controls">
+        <button class="replay-btn" onclick="replayStep(-1)">⏮</button>
+        <button class="replay-btn" id="replay-play-btn" onclick="toggleReplay()">▶ 播放</button>
+        <button class="replay-btn" onclick="replayStep(1)">⏭</button>
+        <select class="replay-speed" id="replay-speed" onchange="updateReplaySpeed()">
+          <option value="1200">慢速</option>
+          <option value="600" selected>正常</option>
+          <option value="300">快速</option>
+          <option value="100">超快</option>
+        </select>
+        <span class="replay-time" id="replay-time-label">0 / 0</span>
+      </div>
+    </div>
+  </div>
+
 
 <!-- ── 移动端底部抽屉（手机专用）── -->
 <div id="mobile-drawer" class="collapsed">
@@ -701,11 +839,17 @@ async function loadHistory() {
     return;
   }
 
-  // 按 player_id 分组
+  // 按 player_id 分组，同时存入全局 histGroups 供回放使用
   const groups = {};
+  histGroups = {};
   data.forEach(row => {
-    if (!groups[row.player_id]) groups[row.player_id] = { nickname: row.nickname, rows: [] };
+    if (!groups[row.player_id]) {
+      groups[row.player_id] = { nickname: row.nickname, rows: [] };
+      histGroups[row.player_id] = groups[row.player_id];
+    }
     groups[row.player_id].rows.push(row);
+    // 补充 player_id 字段供回放使用
+    row.player_id = row.player_id || Object.keys(groups).find(k => groups[k] === groups[row.player_id]);
   });
 
   el.innerHTML = Object.entries(groups).map(([pid, g]) => `
@@ -714,6 +858,7 @@ async function loadHistory() {
         <span>🙈</span>
         <span class="hist-group-name">${g.nickname}</span>
         <span class="hist-group-count">${g.rows.length} 条记录</span>
+        <button class="replay-launch-btn" onclick="event.stopPropagation();startReplay('${pid}')">🎬 回放</button>
         <span class="hist-chevron">▶</span>
       </div>
       <div class="hist-rows">
@@ -738,6 +883,162 @@ function toggleGroup(pid) {
   const el = document.getElementById('hg-' + CSS.escape(pid));
   el.classList.toggle('open');
 }
+
+// ── 轨迹回放 ─────────────────────────────────────────
+let replayData    = [];    // 当前回放的坐标点数组
+let replayIdx     = 0;     // 当前帧索引
+let replayTimer   = null;  // 播放定时器
+let replayMarker  = null;  // 回放专用标记
+let replayPolyline = null; // 轨迹线
+let replayPlaying = false;
+let histGroups    = {};    // 缓存历史分组数据（由 loadHistory 填充）
+
+// 从历史记录发起回放
+async function startReplay(pid) {
+  // 切换到地图视图
+  switchTab('map');
+
+  const g = histGroups[pid];
+  if (!g || !g.rows.length) {
+    toast('该玩家暂无历史记录');
+    return;
+  }
+
+  // 按时间升序排列
+  replayData = [...g.rows].sort((a,b) => new Date(a.recorded_at) - new Date(b.recorded_at));
+  replayIdx  = 0;
+  replayPlaying = false;
+
+  // 显示回放面板
+  document.getElementById('replay-panel').classList.add('show');
+  document.getElementById('replay-pname').textContent = g.nickname;
+  document.getElementById('replay-info').style.display = 'block';
+  document.getElementById('replay-play-btn').textContent = '▶ 播放';
+
+  // 清除旧轨迹
+  cleanReplayLayers();
+
+  // 画轨迹线（所有点）
+  const latlngs = replayData.map(r => [r.lat, r.lng]);
+  replayPolyline = L.polyline(latlngs, {
+    color: '#7c6af7', weight: 3, opacity: 0.7,
+    dashArray: '6,4'
+  }).addTo(map);
+
+  // 起点标记
+  L.circleMarker(latlngs[0], { radius:6, color:'#4ade80', fillColor:'#4ade80', fillOpacity:1, weight:2 })
+    .addTo(map).bindTooltip('起点').openTooltip();
+
+  // 终点标记
+  if (latlngs.length > 1) {
+    L.circleMarker(latlngs[latlngs.length-1], { radius:6, color:'#f85149', fillColor:'#f85149', fillOpacity:1, weight:2 })
+      .addTo(map).bindTooltip('终点');
+  }
+
+  // 飞到轨迹范围
+  map.flyToBounds(replayPolyline.getBounds(), { padding:[60,100], duration:1 });
+
+  // 渲染第0帧
+  renderReplayFrame();
+}
+
+function renderReplayFrame() {
+  const total = replayData.length;
+  if (!total) return;
+  const row = replayData[replayIdx];
+  const latlng = [row.lat, row.lng];
+
+  // 移动/创建回放标记
+  if (replayMarker) {
+    replayMarker.setLatLng(latlng);
+  } else {
+    replayMarker = L.marker(latlng, {
+      icon: L.divIcon({
+        html:`<div style="width:30px;height:30px;border-radius:50%;
+          background:linear-gradient(135deg,#7c6af7,#f76a8c);
+          display:flex;align-items:center;justify-content:center;
+          box-shadow:0 2px 10px rgba(124,106,247,.6);
+          border:2px solid white;font-size:14px;">🙈</div>`,
+        iconSize:[30,30], iconAnchor:[15,15], className:''
+      })
+    }).addTo(map);
+  }
+
+  // 更新进度条
+  const pct = total > 1 ? (replayIdx / (total-1)) * 100 : 100;
+  document.getElementById('replay-prog-fill').style.width  = pct + '%';
+  document.getElementById('replay-prog-thumb').style.left  = pct + '%';
+  document.getElementById('replay-time-label').textContent = `${replayIdx+1} / ${total}`;
+
+  // 更新信息浮窗
+  const t = new Date(row.recorded_at);
+  const ts = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+  document.getElementById('ri-name').textContent  = replayData[0] ? histGroups[row.player_id]?.nickname || '玩家' : '--';
+  document.getElementById('ri-time').textContent  = ts;
+  document.getElementById('ri-coord').textContent = `${row.lat.toFixed(6)}, ${row.lng.toFixed(6)}`;
+  document.getElementById('ri-acc').textContent   = `精度 ±${row.accuracy}m`;
+}
+
+function toggleReplay() {
+  if (replayPlaying) {
+    pauseReplay();
+  } else {
+    playReplay();
+  }
+}
+
+function playReplay() {
+  if (replayIdx >= replayData.length - 1) replayIdx = 0; // 从头播
+  replayPlaying = true;
+  document.getElementById('replay-play-btn').textContent = '⏸ 暂停';
+  const speed = Number(document.getElementById('replay-speed').value);
+  replayTimer = setInterval(() => {
+    replayIdx++;
+    renderReplayFrame();
+    if (replayIdx >= replayData.length - 1) {
+      pauseReplay();
+    }
+  }, speed);
+}
+
+function pauseReplay() {
+  replayPlaying = false;
+  clearInterval(replayTimer);
+  document.getElementById('replay-play-btn').textContent = '▶ 播放';
+}
+
+function replayStep(dir) {
+  pauseReplay();
+  replayIdx = Math.max(0, Math.min(replayData.length-1, replayIdx + dir));
+  renderReplayFrame();
+}
+
+function replaySeek(e) {
+  const wrap = document.getElementById('replay-prog-wrap');
+  const rect  = wrap.getBoundingClientRect();
+  const pct   = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  replayIdx   = Math.round(pct * (replayData.length - 1));
+  pauseReplay();
+  renderReplayFrame();
+}
+
+function updateReplaySpeed() {
+  if (replayPlaying) { pauseReplay(); playReplay(); }
+}
+
+function closeReplay() {
+  pauseReplay();
+  cleanReplayLayers();
+  document.getElementById('replay-panel').classList.remove('show');
+  document.getElementById('replay-info').style.display = 'none';
+}
+
+function cleanReplayLayers() {
+  if (replayMarker)   { map.removeLayer(replayMarker);   replayMarker = null; }
+  if (replayPolyline) { map.removeLayer(replayPolyline); replayPolyline = null; }
+}
+
+
 
 
 // ── 移动端抽屉 ────────────────────────────────────
@@ -784,7 +1085,7 @@ function toast(msg) {
 // ── 初始化 ───────────────────────────────────────
 
 // ── 密码验证 ──────────────────────────────────────
-const ADMIN_PWD = '0833'; // ← 修改这里改密码
+const ADMIN_PWD = '1234'; // ← 修改这里改密码
 const PWD_STORAGE_KEY = 'hsg_admin_auth';
 const PWD_EXPIRE = 8 * 3600 * 1000; // 8小时内免重新输入
 

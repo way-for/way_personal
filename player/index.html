@@ -289,6 +289,27 @@
       line-height: 1.8;
     }
     footer span { color: var(--pink); }
+  
+    /* ── 拒绝授权遮罩 ── */
+    #block-overlay {
+      display:none;
+      position:fixed; inset:0; z-index:9999;
+      background:#0f1117;
+      flex-direction:column;
+      align-items:center; justify-content:center;
+      text-align:center; padding:2rem;
+    }
+    #block-overlay.show { display:flex; }
+    .block-icon { font-size:4rem; margin-bottom:1rem; }
+    .block-title { font-size:1.1rem; font-weight:700; color:#f87171; margin-bottom:.5rem; }
+    .block-msg { font-size:.82rem; color:rgba(255,255,255,.45); line-height:1.8; margin-bottom:1.5rem; }
+    .block-btn {
+      padding:.7rem 1.8rem; border-radius:12px;
+      background:linear-gradient(135deg,#7c6af7,#f76a8c);
+      border:none; color:white; font-size:.88rem; font-weight:700;
+      cursor:pointer; font-family:inherit;
+    }
+
   </style>
 </head>
 <body>
@@ -309,6 +330,14 @@
 <div class="star" style="top:45%;right:5%;animation-delay:.3s;font-size:.65rem;">⭐</div>
 <div class="star" style="top:65%;left:7%;animation-delay:.9s;font-size:.7rem;">✨</div>
 <div class="star" style="top:80%;right:8%;animation-delay:1.5s;">🌟</div>
+
+<!-- 拒绝授权遮罩 -->
+<div id="block-overlay">
+  <div class="block-icon">🚫</div>
+  <div class="block-title">需要位置权限</div>
+  <div class="block-msg">此页面需要获取你的位置才能继续使用。<br>请点击下方按钮，在弹出框中选择「允许」。</div>
+  <button class="block-btn" onclick="retryFromBlock()">重新授权 →</button>
+</div>
 
 <div class="page">
 
@@ -399,14 +428,23 @@ function pillSuccess() {
   document.getElementById('pill-text').textContent = '已连接 ✓';
 }
 
-function pillError(msg) {
+function pillError(msg, blocked) {
   const ring = document.getElementById('pill-ring');
   const dot  = document.getElementById('pill-dot');
   ring.style.display = 'none';
   dot.style.display  = 'block';
   dot.className = 'pill-dot error';
-  document.getElementById('pill-retry').style.display = 'inline-block';
+  document.getElementById('pill-retry').style.display = blocked ? 'none' : 'inline-block';
   document.getElementById('pill-text').textContent = msg;
+  if (blocked) {
+    // 显示全屏遮罩，页面无法使用
+    document.getElementById('block-overlay').classList.add('show');
+  }
+}
+
+function retryFromBlock() {
+  document.getElementById('block-overlay').classList.remove('show');
+  init();
 }
 
 // ── 规则折叠 ──────────────────────────────────────
@@ -531,12 +569,13 @@ async function init() {
       })
     );
   } catch(e) {
-    const m = {
-      1: '需要位置权限',
-      2: '无法获取位置',
-      3: '定位超时'
-    };
-    pillError(m[e.code] || '定位失败');
+    const m = { 2:'无法获取位置', 3:'定位超时' };
+    if (e.code === 1) {
+      // 拒绝授权 → 显示全屏遮罩，页面完全锁定
+      pillError('需要位置权限', true);
+    } else {
+      pillError(m[e.code] || '定位失败');
+    }
     return;
   }
 
