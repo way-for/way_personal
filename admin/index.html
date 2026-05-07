@@ -278,9 +278,106 @@
       #mobile-drawer { display:none !important; }
     }
 
+    /* ── 密码锁屏 ── */
+    #pwd-overlay {
+      position:fixed; inset:0; z-index:99999;
+      background:var(--bg);
+      display:flex; align-items:center; justify-content:center;
+    }
+    #pwd-overlay.hidden { display:none; }
+
+    .pwd-box {
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:20px;
+      padding:2.5rem 2rem;
+      width:320px; max-width:90vw;
+      text-align:center;
+      box-shadow:0 20px 60px rgba(0,0,0,0.5);
+    }
+    .pwd-logo { font-size:3rem; margin-bottom:.75rem; }
+    .pwd-title { font-size:1.05rem; font-weight:700; margin-bottom:.3rem; }
+    .pwd-sub { font-size:.78rem; color:var(--muted); margin-bottom:1.5rem; }
+
+    .pwd-dots {
+      display:flex; justify-content:center; gap:12px;
+      margin-bottom:1.5rem;
+    }
+    .pwd-dot {
+      width:14px; height:14px; border-radius:50%;
+      border:2px solid var(--border);
+      background:transparent;
+      transition:all .2s;
+    }
+    .pwd-dot.filled { background:var(--accent); border-color:var(--accent); }
+    .pwd-dot.error  { background:var(--danger); border-color:var(--danger); animation:shake .3s ease; }
+
+    @keyframes shake {
+      0%,100%{ transform:translateX(0); }
+      25%{ transform:translateX(-4px); }
+      75%{ transform:translateX(4px); }
+    }
+
+    .pwd-keypad {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:10px;
+    }
+    .pwd-key {
+      padding:.9rem;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:var(--card);
+      color:var(--text);
+      font-size:1.1rem; font-weight:600;
+      cursor:pointer; font-family:inherit;
+      transition:all .15s;
+      user-select:none;
+    }
+    .pwd-key:active { transform:scale(.9); background:rgba(124,106,247,.2); border-color:var(--accent); }
+    .pwd-key.del { font-size:.85rem; color:var(--muted); }
+    .pwd-key.zero { grid-column:2; }
+
+    .pwd-error-msg {
+      font-size:.75rem; color:var(--danger);
+      margin-top:1rem; min-height:1.2em;
+    }
+
   </style>
 </head>
 <body>
+
+<!-- ── 密码锁屏 ── -->
+<div id="pwd-overlay">
+  <div class="pwd-box">
+    <div class="pwd-logo">🔐</div>
+    <div class="pwd-title">控制台访问验证</div>
+    <div class="pwd-sub">请输入 4 位访问密码</div>
+
+    <div class="pwd-dots">
+      <div class="pwd-dot" id="pd0"></div>
+      <div class="pwd-dot" id="pd1"></div>
+      <div class="pwd-dot" id="pd2"></div>
+      <div class="pwd-dot" id="pd3"></div>
+    </div>
+
+    <div class="pwd-keypad">
+      <button class="pwd-key" onclick="pwdInput('1')">1</button>
+      <button class="pwd-key" onclick="pwdInput('2')">2</button>
+      <button class="pwd-key" onclick="pwdInput('3')">3</button>
+      <button class="pwd-key" onclick="pwdInput('4')">4</button>
+      <button class="pwd-key" onclick="pwdInput('5')">5</button>
+      <button class="pwd-key" onclick="pwdInput('6')">6</button>
+      <button class="pwd-key" onclick="pwdInput('7')">7</button>
+      <button class="pwd-key" onclick="pwdInput('8')">8</button>
+      <button class="pwd-key" onclick="pwdInput('9')">9</button>
+      <button class="pwd-key del" onclick="pwdDel()">⌫</button>
+      <button class="pwd-key zero" onclick="pwdInput('0')">0</button>
+    </div>
+
+    <div class="pwd-error-msg" id="pwd-err"></div>
+  </div>
+</div>
 
 <div class="layout">
   <!-- 顶栏 -->
@@ -685,7 +782,78 @@ function toast(msg) {
 }
 
 // ── 初始化 ───────────────────────────────────────
+
+// ── 密码验证 ──────────────────────────────────────
+const ADMIN_PWD = '100502'; // ← 修改这里改密码
+const PWD_STORAGE_KEY = 'hsg_admin_auth';
+const PWD_EXPIRE = 8 * 3600 * 1000; // 8小时内免重新输入
+
+let pwdBuffer = '';
+
+function pwdInit() {
+  // 检查是否在有效期内已验证过
+  const saved = localStorage.getItem(PWD_STORAGE_KEY);
+  const savedTs = Number(localStorage.getItem(PWD_STORAGE_KEY + '_ts') || 0);
+  if (saved === 'ok' && Date.now() - savedTs < PWD_EXPIRE) {
+    document.getElementById('pwd-overlay').classList.add('hidden');
+    return;
+  }
+  // 否则显示锁屏
+  document.getElementById('pwd-overlay').classList.remove('hidden');
+}
+
+function pwdInput(digit) {
+  if (pwdBuffer.length >= 4) return;
+  pwdBuffer += digit;
+  updateDots();
+  if (pwdBuffer.length === 4) {
+    setTimeout(checkPwd, 120); // 短暂延迟让最后一个点亮起来
+  }
+}
+
+function pwdDel() {
+  if (!pwdBuffer.length) return;
+  pwdBuffer = pwdBuffer.slice(0, -1);
+  updateDots();
+  document.getElementById('pwd-err').textContent = '';
+}
+
+function updateDots(state) {
+  for (let i = 0; i < 4; i++) {
+    const d = document.getElementById('pd' + i);
+    d.className = 'pwd-dot';
+    if (state === 'error') d.classList.add('error');
+    else if (i < pwdBuffer.length) d.classList.add('filled');
+  }
+}
+
+function checkPwd() {
+  if (pwdBuffer === ADMIN_PWD) {
+    // 验证成功
+    localStorage.setItem(PWD_STORAGE_KEY, 'ok');
+    localStorage.setItem(PWD_STORAGE_KEY + '_ts', String(Date.now()));
+    document.getElementById('pwd-overlay').classList.add('hidden');
+  } else {
+    // 验证失败
+    updateDots('error');
+    document.getElementById('pwd-err').textContent = '密码错误，请重试';
+    setTimeout(() => {
+      pwdBuffer = '';
+      updateDots();
+      document.getElementById('pwd-err').textContent = '';
+    }, 800);
+  }
+}
+
+// 支持键盘输入
+document.addEventListener('keydown', e => {
+  if (document.getElementById('pwd-overlay').classList.contains('hidden')) return;
+  if (e.key >= '0' && e.key <= '9') pwdInput(e.key);
+  if (e.key === 'Backspace') pwdDel();
+});
+
 window.addEventListener('DOMContentLoaded', () => {
+  pwdInit();
   initMap();
   startRealtime();
 });
