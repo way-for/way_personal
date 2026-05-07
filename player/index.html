@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🙈 躲猫猫</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0f1117;
+      --card: #1e2130;
+      --border: rgba(255,255,255,0.07);
+      --accent: #7c6af7;
+      --accent2: #f76a8c;
+      --text: #f0eeff;
+      --muted: rgba(240,238,255,0.45);
+      --success: #4ade80;
+      --danger: #f87171;
+    }
+
+    html, body {
+      height: 100%; background: var(--bg); color: var(--text);
+      font-family: 'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;
+    }
+
+    #bg-canvas { position: fixed; inset: 0; z-index: 0; opacity: 0.3; pointer-events: none; }
+
+    .page {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2rem 1.25rem;
+    }
+
+    /* Logo & title */
+    .logo {
+      font-size: 5rem; margin-bottom: 0.5rem;
+      animation: float 3s ease-in-out infinite;
+      filter: drop-shadow(0 0 24px rgba(124,106,247,0.5));
+    }
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .title {
+      font-size: 2rem; font-weight: 700; letter-spacing: 0.12em;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; margin-bottom: 2rem; text-align: center;
+    }
+
+    /* Card */
+    .card {
+      width: 100%; max-width: 360px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2rem 1.75rem;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.45);
+    }
+
+    /* Room row */
+    .room-row {
+      display: flex; align-items: center; gap: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 0.9rem 1rem;
+      margin-bottom: 2rem;
+    }
+    .room-icon {
+      width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
+    }
+    .room-label { font-size: 0.78rem; color: var(--muted); margin-bottom: 2px; }
+    .room-name { font-size: 0.98rem; font-weight: 600; }
+
+    /* Status block */
+    .status-block { text-align: center; padding: 0.5rem 0 1.75rem; }
+
+    /* Loading: small spinner only, no text */
+    #state-loading {
+      display: flex; justify-content: center; align-items: center; height: 56px;
+    }
+    .ring {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 2.5px solid var(--border);
+      border-top-color: var(--accent);
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Success */
+    #state-success { display: none; }
+    .check-circle {
+      width: 64px; height: 64px; border-radius: 50%;
+      border: 2.5px solid var(--success);
+      margin: 0 auto 1rem;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.8rem; color: var(--success);
+      animation: pop 0.45s cubic-bezier(.175,.885,.32,1.275) forwards;
+    }
+    @keyframes pop {
+      0% { transform: scale(0.3); opacity: 0; }
+      70% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .success-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .success-sub { font-size: 0.8rem; color: var(--muted); }
+
+    /* Error */
+    #state-error { display: none; }
+    .error-icon { font-size: 2.2rem; margin-bottom: 0.5rem; }
+    .error-title { font-size: 0.95rem; font-weight: 700; color: var(--danger); margin-bottom: 0.35rem; }
+    .error-msg { font-size: 0.78rem; color: var(--muted); line-height: 1.6; margin-bottom: 1rem; }
+    .retry-btn {
+      padding: 0.65rem 1.5rem; border-radius: 10px;
+      border: 1px solid rgba(248,113,113,0.35);
+      background: rgba(248,113,113,0.1); color: var(--danger);
+      font-size: 0.82rem; font-weight: 600; cursor: pointer;
+      font-family: inherit; transition: background 0.18s;
+    }
+    .retry-btn:hover { background: rgba(248,113,113,0.2); }
+
+    /* Rules */
+    .rules { border-top: 1px solid var(--border); padding-top: 1.25rem; }
+    .rules-title { font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; }
+    .rule { display: flex; align-items: flex-start; gap: 8px; font-size: 0.78rem; padding: 4px 0; color: rgba(240,238,255,0.65); }
+    .rule-n {
+      width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; margin-top: 1px;
+      background: rgba(124,106,247,0.18); color: var(--accent);
+      font-size: 0.65rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    footer { margin-top: 2rem; font-size: 0.68rem; color: rgba(255,255,255,0.15); text-align: center; }
+  </style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+
+<div class="page">
+  <div class="logo">🙈</div>
+  <div class="title">躲 猫 猫</div>
+
+  <div class="card">
+    <div class="room-row">
+      <div class="room-icon">🎮</div>
+      <div>
+        <div class="room-label">主持人邀请你加入</div>
+        <div class="room-name" id="room-name">躲猫猫游戏</div>
+      </div>
+    </div>
+
+    <div class="status-block">
+      <!-- 加载中：仅小转圈，无任何文字 -->
+      <div id="state-loading"><div class="ring"></div></div>
+
+      <!-- 成功 -->
+      <div id="state-success">
+        <div class="check-circle">✓</div>
+        <div class="success-title">已加入游戏 🎉</div>
+        <div class="success-sub">游戏进行中，好好玩吧！</div>
+      </div>
+
+      <!-- 错误 -->
+      <div id="state-error">
+        <div class="error-icon">❌</div>
+        <div class="error-title">无法加入游戏</div>
+        <div class="error-msg" id="error-msg">位置获取失败</div>
+        <button class="retry-btn" onclick="init()">重新授权</button>
+      </div>
+    </div>
+
+    <div class="rules">
+      <div class="rules-title">游戏规则</div>
+      <div class="rule"><div class="rule-n">1</div><span>躲藏者有 60 秒准备时间，找好藏身之处</span></div>
+      <div class="rule"><div class="rule-n">2</div><span>寻找者通过地图找到所有躲藏者</span></div>
+      <div class="rule"><div class="rule-n">3</div><span>所有人被找到后游戏结束，寻找者胜利</span></div>
+    </div>
+  </div>
+
+  <footer>本游戏仅用于线下活动娱乐</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+// ── 配置 ──────────────────────────────────────────
+const SUPABASE_URL = 'https://vwohulducmzturnxxaik.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3b2h1bGR1Y216dHVybnh4YWlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMDIyNDAsImV4cCI6MjA5MzY3ODI0MH0.O3_LhcVcK0gPwLp29c4dGAF3D3ZMFOTFewFlRNf1D0A';
+// ─────────────────────────────────────────────────
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 从 URL 读取房间名（仅展示用）
+const params = new URLSearchParams(location.search);
+document.getElementById('room-name').textContent = params.get('name') || '躲猫猫游戏';
+
+// 玩家唯一 ID（本地持久化）
+function getPid() {
+  let id = localStorage.getItem('hsg_pid');
+  if (!id) {
+    id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+    localStorage.setItem('hsg_pid', id);
+  }
+  return id;
+}
+
+// UI 切换
+function showSuccess() {
+  document.getElementById('state-loading').style.display = 'none';
+  document.getElementById('state-error').style.display = 'none';
+  document.getElementById('state-success').style.display = 'block';
+}
+function showError(msg) {
+  document.getElementById('state-loading').style.display = 'none';
+  document.getElementById('state-success').style.display = 'none';
+  document.getElementById('error-msg').textContent = msg;
+  document.getElementById('state-error').style.display = 'block';
+}
+function showLoading() {
+  document.getElementById('state-success').style.display = 'none';
+  document.getElementById('state-error').style.display = 'none';
+  document.getElementById('state-loading').style.display = 'flex';
+}
+
+// Nominatim 反查省市（免费，无需 Key）
+async function geocode(lat, lng) {
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=zh-CN&zoom=10`,
+      { headers: { 'Accept-Language': 'zh-CN' } }
+    );
+    const d = await r.json();
+    const a = d.address || {};
+    const DIRECT = ['北京','上海','天津','重庆'];
+    let prov = (a.province || a.state || '').replace(/省$|自治区$|特别行政区$/, '');
+    let city = (a.city || a.county || a.district || a.town || '').replace(/市$|区$|县$|州$/, '');
+    if (DIRECT.includes(prov)) {
+      const dist = (a.district || a.suburb || '').replace(/区$|县$/, '');
+      return dist ? prov + dist : prov;
+    }
+    if (prov && city && prov !== city) return prov + city;
+    return prov || city || null;
+  } catch { return null; }
+}
+
+// 上报位置到 Supabase
+async function report(pid, nickname, lat, lng, accuracy) {
+  const now = new Date().toISOString();
+
+  // upsert 当前位置（实时表）
+  await db.from('players').upsert({
+    id: pid, nickname, lat, lng,
+    accuracy: Math.round(accuracy),
+    online: true,
+    updated_at: now
+  }, { onConflict: 'id' });
+
+  // 写入历史记录
+  await db.from('location_history').insert({
+    player_id: pid, nickname, lat, lng,
+    accuracy: Math.round(accuracy),
+    recorded_at: now
+  });
+}
+
+// 主流程
+let watchId = null;
+async function init() {
+  showLoading();
+
+  if (!navigator.geolocation) {
+    showError('你的浏览器不支持位置功能，请用微信内置浏览器或 Chrome 打开。');
+    return;
+  }
+
+  // 获取一次性位置
+  let pos;
+  try {
+    pos = await new Promise((ok, fail) =>
+      navigator.geolocation.getCurrentPosition(ok, fail, {
+        enableHighAccuracy: true, timeout: 15000, maximumAge: 0
+      })
+    );
+  } catch(e) {
+    const m = { 1:'你拒绝了位置授权，请在浏览器设置中开启后重试。', 2:'GPS 无法获取位置，请在户外或信号好的地方重试。', 3:'定位超时，请重试。' };
+    showError(m[e.code] || '位置获取失败，请重试。');
+    return;
+  }
+
+  const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+  const pid = getPid();
+
+  // 反查地名（后台静默）
+  let nickname = await geocode(lat, lng);
+  if (!nickname) nickname = '玩家' + Math.floor(Math.random() * 9000 + 1000);
+
+  // 上报
+  await report(pid, nickname, lat, lng, accuracy);
+
+  // 持续追踪（每 15 秒上报一次）
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = navigator.geolocation.watchPosition(
+    p => report(pid, nickname, p.coords.latitude, p.coords.longitude, p.coords.accuracy),
+    null,
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 8000 }
+  );
+
+  // 页面关闭时标记离线
+  window.addEventListener('beforeunload', () => {
+    navigator.geolocation.clearWatch(watchId);
+    // 用 sendBeacon 保证发出去
+    const payload = JSON.stringify([{ id: pid, online: false, updated_at: new Date().toISOString() }]);
+    navigator.sendBeacon(
+      `${SUPABASE_URL}/rest/v1/players?id=eq.${pid}`,
+      new Blob([payload], { type: 'application/json' })
+    );
+  });
+
+  // 全部完成才显示成功
+  showSuccess();
+}
+
+window.addEventListener('DOMContentLoaded', init);
+
+// 粒子背景
+(function() {
+  const c = document.getElementById('bg-canvas');
+  const x = c.getContext('2d');
+  let W, H, pts;
+  function resize() {
+    W = c.width = innerWidth; H = c.height = innerHeight;
+    pts = Array.from({length:50}, () => ({
+      x: Math.random()*W, y: Math.random()*H,
+      r: Math.random()*1.8+0.4,
+      vx:(Math.random()-.5)*.25, vy:(Math.random()-.5)*.25,
+      a: Math.random()*.4+.1
+    }));
+  }
+  function draw() {
+    x.clearRect(0,0,W,H);
+    pts.forEach(p => {
+      x.beginPath(); x.arc(p.x,p.y,p.r,0,Math.PI*2);
+      x.fillStyle=`rgba(124,106,247,${p.a})`; x.fill();
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0)p.x=W; if(p.x>W)p.x=0;
+      if(p.y<0)p.y=H; if(p.y>H)p.y=0;
+    });
+    requestAnimationFrame(draw);
+  }
+  resize(); draw();
+  window.addEventListener('resize', resize);
+})();
+</script>
+</body>
+</html>

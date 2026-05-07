@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎮 躲猫猫 · 控制台</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    :root {
+      --bg:#0d1117; --panel:#161b22; --card:#1c2128;
+      --border:rgba(255,255,255,0.07);
+      --accent:#7c6af7; --accent2:#f76a8c;
+      --text:#e6edf3; --muted:rgba(230,237,243,0.48);
+      --success:#3fb950; --danger:#f85149; --warn:#d29922;
+    }
+    html,body { height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif; }
+
+    /* ── 布局 ── */
+    .layout { display:grid; grid-template-columns:290px 1fr; grid-template-rows:50px 1fr; height:100vh; }
+
+    /* ── 顶栏 ── */
+    .topbar {
+      grid-column:1/-1;
+      background:var(--panel); border-bottom:1px solid var(--border);
+      display:flex; align-items:center; padding:0 1rem; gap:10px;
+    }
+    .topbar-logo { font-size:1.25rem; }
+    .topbar-title { font-size:0.9rem; font-weight:700; }
+    .live-pill {
+      display:flex; align-items:center; gap:4px;
+      font-size:0.68rem; color:var(--success);
+      background:rgba(63,185,80,0.1);
+      border:1px solid rgba(63,185,80,0.25);
+      padding:2px 7px; border-radius:6px;
+    }
+    .live-dot { width:5px;height:5px;border-radius:50%;background:var(--success);animation:pulse 1.4s infinite; }
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+    .topbar-gap { flex:1; }
+    .topbar-timer { font-size:0.82rem;font-weight:600;color:var(--warn);background:rgba(210,153,34,.1);padding:3px 9px;border-radius:6px; }
+    .tab-btn {
+      padding:3px 12px; border-radius:6px; border:1px solid var(--border);
+      background:transparent; color:var(--muted); font-size:0.75rem; cursor:pointer;
+      font-family:inherit; transition:all .15s;
+    }
+    .tab-btn.active { background:rgba(124,106,247,.18); border-color:var(--accent); color:var(--text); }
+    .tab-btn:hover:not(.active) { background:var(--card); }
+
+    /* ── 侧栏 ── */
+    .sidebar { background:var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+
+    .sb-section { padding:.75rem .9rem; border-bottom:1px solid var(--border); }
+    .sb-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:.55rem; }
+
+    /* 统计 */
+    .stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; }
+    .stat { background:var(--card); border:1px solid var(--border); border-radius:7px; padding:.5rem; text-align:center; }
+    .stat-n { font-size:1.35rem; font-weight:700; }
+    .stat-l { font-size:.6rem; color:var(--muted); margin-top:1px; }
+    .s-hider .stat-n{color:var(--accent);} .s-seeker .stat-n{color:var(--accent2);}
+
+    /* 玩家列表 */
+    .player-list { flex:1; overflow-y:auto; padding:.4rem .7rem; }
+    .player-list::-webkit-scrollbar{width:3px;}
+    .player-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+    .pi {
+      display:flex; align-items:center; gap:8px;
+      padding:.5rem .6rem; border-radius:7px; margin-bottom:2px;
+      cursor:pointer; border:1px solid transparent; transition:background .15s;
+    }
+    .pi:hover{background:var(--card);}
+    .pi.focused{background:var(--card);border-color:var(--accent);}
+    .pi.offline{opacity:.3;}
+    .pi-ico{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0;}
+    .pi-ico.hider{background:rgba(124,106,247,.2);}
+    .pi-ico.seeker{background:rgba(247,106,140,.2);}
+    .pi-info{flex:1;min-width:0;}
+    .pi-name{font-size:.83rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .pi-role{font-size:.66rem;color:var(--muted);margin-top:1px;}
+    .pi-meta{text-align:right;flex-shrink:0;}
+    .pi-status{font-size:.65rem;margin-bottom:1px;}
+    .pi-time{font-size:.6rem;color:var(--muted);}
+    .on-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--success);margin-right:2px;vertical-align:middle;}
+    .off-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--danger);margin-right:2px;vertical-align:middle;}
+
+    .empty{text-align:center;padding:2rem 1rem;color:var(--muted);font-size:.78rem;}
+    .empty-ico{font-size:1.8rem;margin-bottom:.4rem;}
+
+    /* 控制按钮 */
+    .ctrl-area{padding:.75rem .9rem;border-top:1px solid var(--border);display:grid;gap:5px;}
+    .btn{
+      width:100%;padding:.55rem .9rem;border-radius:7px;
+      border:1px solid var(--border);background:var(--card);color:var(--text);
+      font-size:.76rem;font-weight:600;cursor:pointer;font-family:inherit;
+      display:flex;align-items:center;justify-content:center;gap:5px;transition:all .15s;
+    }
+    .btn:hover{background:rgba(124,106,247,.12);border-color:var(--accent);}
+    .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;}
+    .btn.primary:hover{opacity:.88;}
+    .btn.danger:hover{background:rgba(248,81,73,.12);border-color:var(--danger);color:var(--danger);}
+
+    /* ── 地图 ── */
+    #map{height:100%;}
+    .leaflet-tile-pane{filter:brightness(.72) saturate(.75);}
+    .leaflet-control-attribution{background:rgba(13,17,23,.8)!important;color:var(--muted)!important;font-size:10px!important;}
+    .leaflet-bar a{background:var(--panel)!important;color:var(--text)!important;border-color:var(--border)!important;}
+
+    /* ── 历史面板（覆盖在地图上） ── */
+    #history-panel{
+      display:none; position:absolute; inset:0; z-index:500;
+      background:var(--bg); overflow-y:auto; padding:1rem;
+    }
+    #history-panel.show{display:block;}
+    .hist-header{display:flex;align-items:center;gap:8px;margin-bottom:1rem;}
+    .hist-title{font-size:.95rem;font-weight:700;flex:1;}
+    .hist-close{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:4px 10px;color:var(--text);font-size:.75rem;cursor:pointer;font-family:inherit;}
+
+    /* 按玩家分组 */
+    .hist-group{background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:.75rem;overflow:hidden;}
+    .hist-group-head{
+      display:flex;align-items:center;gap:8px;
+      padding:.65rem .9rem;cursor:pointer;
+      border-bottom:1px solid var(--border);
+      user-select:none;
+    }
+    .hist-group-head:hover{background:rgba(255,255,255,.03);}
+    .hist-group-name{font-size:.85rem;font-weight:600;flex:1;}
+    .hist-group-count{font-size:.68rem;color:var(--muted);}
+    .hist-chevron{font-size:.7rem;color:var(--muted);transition:transform .2s;}
+    .hist-group.open .hist-chevron{transform:rotate(90deg);}
+
+    .hist-rows{display:none;}
+    .hist-group.open .hist-rows{display:block;}
+
+    .hist-row{
+      display:grid;grid-template-columns:90px 1fr 70px;
+      align-items:center;gap:8px;
+      padding:.45rem .9rem;border-bottom:1px solid rgba(255,255,255,.04);
+      font-size:.72rem;
+    }
+    .hist-row:last-child{border-bottom:none;}
+    .hist-time{color:var(--muted);}
+    .hist-coord{font-family:monospace;font-size:.68rem;color:var(--accent);}
+    .hist-acc{color:var(--muted);text-align:right;}
+
+    /* ── 吐司 ── */
+    #toast{
+      position:fixed;bottom:1.25rem;left:50%;
+      transform:translateX(-50%) translateY(70px);
+      background:var(--card);border:1px solid var(--border);
+      border-radius:9px;padding:.55rem 1rem;
+      font-size:.8rem;z-index:9999;
+      transition:transform .28s;pointer-events:none;
+    }
+    #toast.show{transform:translateX(-50%) translateY(0);}
+
+    /* ── 邀请链接显示 ── */
+    .invite-bar{
+      font-size:.68rem;color:var(--accent);
+      background:rgba(124,106,247,.08);
+      border:1px solid rgba(124,106,247,.2);
+      border-radius:7px;padding:.45rem .7rem;
+      cursor:pointer;word-break:break-all;
+      transition:background .15s;
+    }
+    .invite-bar:hover{background:rgba(124,106,247,.15);}
+
+    /* map container relative for overlay */
+    .map-wrap{position:relative;overflow:hidden;}
+  </style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- 顶栏 -->
+  <div class="topbar">
+    <div class="topbar-logo">🙈</div>
+    <div class="topbar-title">躲猫猫控制台</div>
+    <div class="live-pill"><div class="live-dot"></div>实时</div>
+    <div class="topbar-gap"></div>
+    <button class="tab-btn active" id="tab-map" onclick="switchTab('map')">地图</button>
+    <button class="tab-btn" id="tab-hist" onclick="switchTab('hist')">历史记录</button>
+    <div class="topbar-timer" id="timer">00:00</div>
+  </div>
+
+  <!-- 侧栏 -->
+  <div class="sidebar">
+    <!-- 统计 -->
+    <div class="sb-section">
+      <div class="sb-label">实时统计</div>
+      <div class="stats">
+        <div class="stat"><div class="stat-n" id="s-total">0</div><div class="stat-l">全部</div></div>
+        <div class="stat s-hider"><div class="stat-n" id="s-hider">0</div><div class="stat-l">躲藏者</div></div>
+        <div class="stat s-seeker"><div class="stat-n" id="s-seeker">0</div><div class="stat-l">寻找者</div></div>
+      </div>
+    </div>
+
+    <!-- 邀请链接 -->
+    <div class="sb-section">
+      <div class="sb-label">邀请链接</div>
+      <div class="invite-bar" id="invite-bar" onclick="copyLink()">点击复制邀请链接</div>
+    </div>
+
+    <!-- 玩家列表 -->
+    <div class="sb-section" style="padding-bottom:.4rem;">
+      <div class="sb-label">玩家列表</div>
+    </div>
+    <div class="player-list" id="player-list">
+      <div class="empty"><div class="empty-ico">⏳</div><div>等待玩家加入...</div></div>
+    </div>
+
+    <div style="font-size:.62rem;color:var(--muted);text-align:center;padding:.3rem;">点击玩家在地图定位</div>
+
+    <!-- 控制 -->
+    <div class="ctrl-area">
+      <button class="btn primary" onclick="startGame()">▶ 开始游戏</button>
+      <button class="btn" onclick="centerAll()">🗺 全部居中</button>
+      <button class="btn danger" onclick="endGame()">■ 结束游戏</button>
+    </div>
+  </div>
+
+  <!-- 地图+历史面板 -->
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div id="history-panel">
+      <div class="hist-header">
+        <div class="hist-title">📋 位置历史记录</div>
+        <button class="hist-close" onclick="switchTab('map')">← 返回地图</button>
+      </div>
+      <div id="hist-content"><div class="empty"><div class="empty-ico">⏳</div><div>加载中...</div></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+// ── 配置 ─────────────────────────────────────────
+const SUPABASE_URL = 'https://vwohulducmzturnxxaik.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3b2h1bGR1Y216dHVybnh4YWlrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxMDIyNDAsImV4cCI6MjA5MzY3ODI0MH0.O3_LhcVcK0gPwLp29c4dGAF3D3ZMFOTFewFlRNf1D0A';
+const PLAYER_URL  = 'https://way-for.github.io/way_personal/player/index.html';
+// ─────────────────────────────────────────────────
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let map, players = {}, markers = {}, focused = null;
+let gameTimer = null, gameSeconds = 0, listTimer = null;
+let autoFit = false;
+
+const ROLE = {
+  hider:  { icon:'🙈', color:'#7c6af7', label:'躲藏者' },
+  seeker: { icon:'🔍', color:'#f76a8c', label:'寻找者' }
+};
+
+// ── 邀请链接 ──────────────────────────────────────
+function buildLink() { return PLAYER_URL + '?name=' + encodeURIComponent('躲猫猫游戏'); }
+function copyLink() {
+  navigator.clipboard.writeText(buildLink()).then(() => toast('邀请链接已复制！'));
+}
+document.getElementById('invite-bar').textContent = buildLink();
+
+// ── 地图 ─────────────────────────────────────────
+function initMap() {
+  map = L.map('map', { zoomControl:true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution:'© OpenStreetMap', maxZoom:19
+  }).addTo(map);
+  map.setView([35, 105], 5);
+}
+
+function makeIcon(role) {
+  const r = ROLE[role] || ROLE.hider;
+  return L.divIcon({
+    html:`<div style="width:36px;height:36px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+      background:${r.color};display:flex;align-items:center;justify-content:center;
+      box-shadow:0 3px 10px rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.2);">
+      <span style="transform:rotate(45deg);font-size:15px;">${r.icon}</span></div>`,
+    iconSize:[36,36], iconAnchor:[18,36], popupAnchor:[0,-40], className:''
+  });
+}
+
+function popupHtml(p) {
+  const r = ROLE[p.role] || ROLE.hider;
+  const ago = p.updated_at ? Math.round((Date.now() - new Date(p.updated_at)) / 1000) : '?';
+  return `<div style="font-family:system-ui;min-width:150px;font-size:13px;">
+    <b>${r.icon} ${p.nickname}</b><br>
+    <span style="color:#888;font-size:11px;">${r.label}</span><br>
+    <span style="color:#888;font-size:11px;">精度：±${p.accuracy}m · ${ago}s前</span><br>
+    <span style="color:#aaa;font-size:10px;font-family:monospace;">
+      ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}
+    </span>
+  </div>`;
+}
+
+// ── 更新玩家 ─────────────────────────────────────
+function upsertPlayer(p) {
+  players[p.id] = p;
+  if (markers[p.id]) {
+    markers[p.id].setLatLng([p.lat, p.lng]);
+    markers[p.id].getPopup().setContent(popupHtml(p));
+    // 更新图标（角色可能变化）
+    markers[p.id].setIcon(makeIcon(p.role));
+  } else {
+    markers[p.id] = L.marker([p.lat, p.lng], { icon: makeIcon(p.role) })
+      .addTo(map).bindPopup(popupHtml(p));
+  }
+  if (focused === p.id) map.panTo([p.lat, p.lng]);
+  renderList(); updateStats(); tryAutoFit();
+}
+
+function removeMarker(id) {
+  if (markers[id]) { map.removeLayer(markers[id]); delete markers[id]; }
+  delete players[id];
+  renderList(); updateStats();
+}
+
+// ── 实时订阅 ─────────────────────────────────────
+function startRealtime() {
+  // 先拉一次全量
+  db.from('players').select('*').eq('online', true).then(({ data }) => {
+    (data || []).forEach(upsertPlayer);
+  });
+
+  // 实时推送
+  db.channel('players-changes')
+    .on('postgres_changes', { event:'*', schema:'public', table:'players' }, payload => {
+      const { eventType, new: n, old: o } = payload;
+      if (eventType === 'DELETE') { removeMarker(o.id); return; }
+      if (n.online === false) {
+        // 离线：移除标记、从列表移除
+        removeMarker(n.id); return;
+      }
+      upsertPlayer(n);
+    })
+    .subscribe(status => {
+      console.log('Realtime:', status);
+    });
+}
+
+// ── 列表渲染 ─────────────────────────────────────
+function renderList() {
+  if (listTimer) clearTimeout(listTimer);
+  const el = document.getElementById('player-list');
+  const pids = Object.keys(players);
+  if (pids.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="empty-ico">⏳</div><div>等待玩家加入...</div></div>';
+    return;
+  }
+  el.innerHTML = pids.map(id => {
+    const p = players[id];
+    const r = ROLE[p.role] || ROLE.hider;
+    const ago = p.updated_at ? Math.round((Date.now() - new Date(p.updated_at)) / 1000) : '?';
+    return `<div class="pi ${focused===id?'focused':''}" onclick="focusPlayer('${id}')">
+      <div class="pi-ico ${p.role||'hider'}">${r.icon}</div>
+      <div class="pi-info">
+        <div class="pi-name">${p.nickname}</div>
+        <div class="pi-role" style="color:${r.color}">${r.label}</div>
+      </div>
+      <div class="pi-meta">
+        <div class="pi-status"><span class="on-dot"></span><span style="color:var(--success);font-size:.65rem;">在线</span></div>
+        <div class="pi-time">±${p.accuracy}m · ${ago}s前</div>
+      </div>
+    </div>`;
+  }).join('');
+  listTimer = setTimeout(renderList, 5000);
+}
+
+function updateStats() {
+  const vals = Object.values(players);
+  document.getElementById('s-total').textContent = vals.length;
+  document.getElementById('s-hider').textContent = vals.filter(p=>p.role==='hider').length;
+  document.getElementById('s-seeker').textContent = vals.filter(p=>p.role==='seeker').length;
+}
+
+function tryAutoFit() {
+  if (autoFit) return;
+  const pts = Object.values(players).filter(p=>p.lat&&p.lng);
+  if (!pts.length) return;
+  autoFit = true;
+  map.flyToBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])), { padding:[80,80], maxZoom:16, duration:1.5 });
+}
+
+// ── 聚焦玩家 ─────────────────────────────────────
+function focusPlayer(id) {
+  focused = focused === id ? null : id;
+  renderList();
+  const p = players[id];
+  if (p) { map.flyTo([p.lat, p.lng], 17, {duration:1}); markers[id]?.openPopup(); }
+}
+
+// ── 全部居中 ─────────────────────────────────────
+function centerAll() {
+  focused = null; renderList();
+  const pts = Object.values(players).filter(p=>p.lat&&p.lng);
+  if (!pts.length) return toast('暂无玩家位置');
+  map.flyToBounds(L.latLngBounds(pts.map(p=>[p.lat,p.lng])), { padding:[60,60], duration:1 });
+}
+
+// ── 游戏控制 ─────────────────────────────────────
+function startGame() {
+  gameSeconds = 0;
+  if (gameTimer) clearInterval(gameTimer);
+  gameTimer = setInterval(() => {
+    gameSeconds++;
+    const m = String(Math.floor(gameSeconds/60)).padStart(2,'0');
+    const s = String(gameSeconds%60).padStart(2,'0');
+    document.getElementById('timer').textContent = `${m}:${s}`;
+  }, 1000);
+  toast('🎮 游戏开始！');
+}
+
+function endGame() {
+  if (!confirm('确定结束游戏？')) return;
+  if (gameTimer) clearInterval(gameTimer);
+  document.getElementById('timer').textContent = '结束';
+  toast('游戏已结束');
+}
+
+// ── 标签页切换 ───────────────────────────────────
+function switchTab(t) {
+  document.getElementById('tab-map').classList.toggle('active', t==='map');
+  document.getElementById('tab-hist').classList.toggle('active', t==='hist');
+  const hp = document.getElementById('history-panel');
+  if (t==='hist') { hp.classList.add('show'); loadHistory(); }
+  else hp.classList.remove('show');
+}
+
+// ── 历史记录 ─────────────────────────────────────
+async function loadHistory() {
+  const el = document.getElementById('hist-content');
+  el.innerHTML = '<div class="empty"><div class="empty-ico">⏳</div><div>加载中...</div></div>';
+
+  const { data, error } = await db
+    .from('location_history')
+    .select('*')
+    .order('recorded_at', { ascending: false })
+    .limit(2000);
+
+  if (error || !data) {
+    el.innerHTML = '<div class="empty">加载失败，请检查数据库连接</div>';
+    return;
+  }
+  if (data.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="empty-ico">📭</div><div>暂无历史记录</div></div>';
+    return;
+  }
+
+  // 按 player_id 分组
+  const groups = {};
+  data.forEach(row => {
+    if (!groups[row.player_id]) groups[row.player_id] = { nickname: row.nickname, rows: [] };
+    groups[row.player_id].rows.push(row);
+  });
+
+  el.innerHTML = Object.entries(groups).map(([pid, g]) => `
+    <div class="hist-group" id="hg-${CSS.escape(pid)}">
+      <div class="hist-group-head" onclick="toggleGroup('${pid}')">
+        <span>🙈</span>
+        <span class="hist-group-name">${g.nickname}</span>
+        <span class="hist-group-count">${g.rows.length} 条记录</span>
+        <span class="hist-chevron">▶</span>
+      </div>
+      <div class="hist-rows">
+        <div class="hist-row" style="font-size:.65rem;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.06);">
+          <span>时间</span><span>经纬度</span><span style="text-align:right;">精度</span>
+        </div>
+        ${g.rows.map(r => {
+          const t = new Date(r.recorded_at);
+          const ts = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
+          return `<div class="hist-row">
+            <span class="hist-time">${ts}</span>
+            <span class="hist-coord">${r.lat.toFixed(6)}, ${r.lng.toFixed(6)}</span>
+            <span class="hist-acc">±${r.accuracy}m</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleGroup(pid) {
+  const el = document.getElementById('hg-' + CSS.escape(pid));
+  el.classList.toggle('open');
+}
+
+// ── 吐司 ─────────────────────────────────────────
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// ── 初始化 ───────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  startRealtime();
+});
+</script>
+</body>
+</html>
