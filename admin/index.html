@@ -894,8 +894,6 @@ async function loadHistory() {
       histGroups[row.player_id] = groups[row.player_id];
     }
     groups[row.player_id].rows.push(row);
-    // 补充 player_id 字段供回放使用
-    row.player_id = row.player_id || Object.keys(groups).find(k => groups[k] === groups[row.player_id]);
   });
 
   el.innerHTML = Object.entries(groups).map(([pid, g]) => `
@@ -931,13 +929,15 @@ function toggleGroup(pid) {
 }
 
 // ── 轨迹回放 ─────────────────────────────────────────
-let replayData    = [];    // 当前回放的坐标点数组
-let replayIdx     = 0;     // 当前帧索引
-let replayTimer   = null;  // 播放定时器
-let replayMarker  = null;  // 回放专用标记
-let replayPolyline = null; // 轨迹线
-let replayPlaying = false;
-let histGroups    = {};    // 缓存历史分组数据（由 loadHistory 填充）
+let replayData      = [];   // 当前回放的坐标点数组
+let replayIdx       = 0;    // 当前帧索引
+let replayTimer     = null; // 播放定时器
+let replayMarker    = null; // 回放专用标记
+let replayPolyline  = null; // 轨迹线
+let replayExtraLayers = []; // 起/终点标记等额外图层
+let replayPlaying   = false;
+let replayNickname  = '';   // 当前回放玩家昵称
+let histGroups      = {};   // 缓存历史分组数据（由 loadHistory 填充）
 
 // 从历史记录发起回放
 async function startReplay(pid) {
@@ -952,6 +952,7 @@ async function startReplay(pid) {
 
   // 按时间升序排列
   replayData = [...g.rows].sort((a,b) => new Date(a.recorded_at) - new Date(b.recorded_at));
+  replayNickname = g.nickname;
   replayIdx  = 0;
   replayPlaying = false;
 
@@ -972,13 +973,15 @@ async function startReplay(pid) {
   }).addTo(map);
 
   // 起点标记
-  L.circleMarker(latlngs[0], { radius:6, color:'#4ade80', fillColor:'#4ade80', fillOpacity:1, weight:2 })
-    .addTo(map).bindTooltip('起点').openTooltip();
+  const startMark = L.circleMarker(latlngs[0], { radius:7, color:'#4ade80', fillColor:'#4ade80', fillOpacity:1, weight:2 })
+    .addTo(map).bindTooltip('起点');
+  replayExtraLayers.push(startMark);
 
   // 终点标记
   if (latlngs.length > 1) {
-    L.circleMarker(latlngs[latlngs.length-1], { radius:6, color:'#f85149', fillColor:'#f85149', fillOpacity:1, weight:2 })
+    const endMark = L.circleMarker(latlngs[latlngs.length-1], { radius:7, color:'#f85149', fillColor:'#f85149', fillOpacity:1, weight:2 })
       .addTo(map).bindTooltip('终点');
+    replayExtraLayers.push(endMark);
   }
 
   // 飞到轨迹范围
@@ -1019,7 +1022,7 @@ function renderReplayFrame() {
   // 更新信息浮窗
   const t = new Date(row.recorded_at);
   const ts = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
-  document.getElementById('ri-name').textContent  = replayData[0] ? histGroups[row.player_id]?.nickname || '玩家' : '--';
+  document.getElementById('ri-name').textContent  = replayNickname || '玩家';
   document.getElementById('ri-time').textContent  = ts;
   document.getElementById('ri-coord').textContent = `${row.lat.toFixed(6)}, ${row.lng.toFixed(6)}`;
   document.getElementById('ri-acc').textContent   = `精度 ±${row.accuracy}m`;
@@ -1080,8 +1083,10 @@ function closeReplay() {
 }
 
 function cleanReplayLayers() {
-  if (replayMarker)   { map.removeLayer(replayMarker);   replayMarker = null; }
-  if (replayPolyline) { map.removeLayer(replayPolyline); replayPolyline = null; }
+  if (replayMarker)     { map.removeLayer(replayMarker);     replayMarker = null; }
+  if (replayPolyline)   { map.removeLayer(replayPolyline);   replayPolyline = null; }
+  replayExtraLayers.forEach(l => map.removeLayer(l));
+  replayExtraLayers = [];
 }
 
 

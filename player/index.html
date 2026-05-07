@@ -236,32 +236,6 @@
     .tool-tv .tool-badge   { background: var(--purple); }
     .tool-game .tool-badge { background: #e9c46a; }
     .tool-fc .tool-badge   { background: var(--pink); }
-
-    /* ── 游戏规则折叠 ── */
-    .rules-wrap {
-      width: 100%; max-width: 400px;
-      background: var(--card);
-      border-radius: 16px;
-      border: 2px solid var(--pink2);
-      overflow: hidden;
-      box-shadow: 0 4px 16px var(--shadow);
-    }
-
-    .rules-toggle {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: .75rem 1rem;
-      cursor: pointer; user-select: none;
-      font-size: 0.82rem; font-weight: 700; color: var(--text);
-    }
-
-    .rules-toggle-left { display: flex; align-items: center; gap: 6px; }
-
-    .rules-arrow {
-      font-size: .7rem; color: var(--muted);
-      transition: transform .25s;
-    }
-    .rules-wrap.open .rules-arrow { transform: rotate(90deg); }
-
     .rules-body {
       max-height: 0; overflow: hidden;
       transition: max-height .3s ease;
@@ -448,9 +422,6 @@ function retryFromBlock() {
 }
 
 // ── 规则折叠 ──────────────────────────────────────
-function toggleRules() {
-  document.getElementById('rules-wrap').classList.toggle('open');
-}
 
 // ── 玩家ID ────────────────────────────────────────
 function getPid() {
