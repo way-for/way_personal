@@ -664,17 +664,53 @@ function makeIcon(role) {
   });
 }
 
-function popupHtml(p) {
+function popupHtml(p, addr) {
   const r = ROLE[p.role] || ROLE.hider;
   const ago = p.updated_at ? Math.round((Date.now() - new Date(p.updated_at)) / 1000) : '?';
-  return `<div style="font-family:system-ui;min-width:150px;font-size:13px;">
-    <b>${r.icon} ${p.nickname}</b><br>
+  const addrLine = addr
+    ? `<div style="margin-top:5px;padding-top:5px;border-top:1px solid #eee;
+        font-size:11px;color:#555;line-height:1.5;">${addr}</div>`
+    : `<div style="margin-top:4px;font-size:10px;color:#bbb;" id="addr-${p.id}">地址加载中...</div>`;
+  return `<div style="font-family:system-ui;min-width:170px;font-size:13px;max-width:220px;">
+    <b style="font-size:14px;">${r.icon} ${p.nickname}</b><br>
     <span style="color:#888;font-size:11px;">${r.label}</span><br>
     <span style="color:#888;font-size:11px;">精度：±${p.accuracy}m · ${ago}s前</span><br>
-    <span style="color:#aaa;font-size:10px;font-family:monospace;">
-      ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}
-    </span>
+    <div style="margin-top:4px;font-size:10px;color:#999;font-family:monospace;
+      background:#f8f8f8;padding:3px 5px;border-radius:4px;word-break:break-all;">
+      📍 ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}
+    </div>
+    ${addrLine}
   </div>`;
+}
+
+// 反查详细地址（Nominatim，zoom=18 获取街道级）
+const addrCache = {};
+async function fetchAddr(pid, lat, lng) {
+  if (addrCache[pid]) return addrCache[pid];
+  try {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=zh-CN&zoom=18`,
+      { headers:{'Accept-Language':'zh-CN'}, signal:ctrl.signal }
+    );
+    const d = await r.json();
+    const a = d.address || {};
+    // 拼完整地址：省/市/区/街道/门牌
+    const parts = [
+      (a.province||a.state||'').replace(/省$|自治区$/,''),
+      (a.city||'').replace(/市$/,''),
+      (a.district||a.county||'').replace(/区$|县$/,''),
+      a.suburb || a.neighbourhood || '',
+      a.road || a.pedestrian || '',
+      a.house_number || ''
+    ].filter(s => s && s.trim());
+    // 去重（直辖市省=市）
+    const unique = parts.filter((s,i) => parts.indexOf(s) === i);
+    const addr = unique.join('') || d.display_name?.split(',').slice(0,4).join('') || '';
+    addrCache[pid] = addr;
+    return addr;
+  } catch { return ''; }
 }
 
 // ── 更新玩家 ─────────────────────────────────────
@@ -682,12 +718,12 @@ function upsertPlayer(p) {
   players[p.id] = p;
   if (markers[p.id]) {
     markers[p.id].setLatLng([p.lat, p.lng]);
-    markers[p.id].getPopup().setContent(popupHtml(p));
+    markers[p.id].getPopup().setContent(popupHtml(p, addrCache[p.id] || null));
     // 更新图标（角色可能变化）
     markers[p.id].setIcon(makeIcon(p.role));
   } else {
     markers[p.id] = L.marker([p.lat, p.lng], { icon: makeIcon(p.role) })
-      .addTo(map).bindPopup(popupHtml(p));
+      .addTo(map).bindPopup(popupHtml(p, null));
   }
   if (focused === p.id) map.panTo([p.lat, p.lng]);
   renderList(); updateStats(); tryAutoFit();
@@ -779,7 +815,17 @@ function focusPlayer(id) {
   focused = focused === id ? null : id;
   renderList();
   const p = players[id];
-  if (p) { map.flyTo([p.lat, p.lng], 17, {duration:1}); markers[id]?.openPopup(); }
+  if (!p) return;
+  map.flyTo([p.lat, p.lng], 17, {duration:1});
+  if (markers[id]) {
+    markers[id].openPopup();
+    // 异步拉取详细地址后更新弹窗
+    fetchAddr(id, p.lat, p.lng).then(addr => {
+      if (addr && markers[id]) {
+        markers[id].getPopup().setContent(popupHtml(p, addr));
+      }
+    });
+  }
 }
 
 // ── 全部居中 ─────────────────────────────────────
@@ -1085,7 +1131,7 @@ function toast(msg) {
 // ── 初始化 ───────────────────────────────────────
 
 // ── 密码验证 ──────────────────────────────────────
-const ADMIN_PWD = '0833'; // ← 修改这里改密码
+const ADMIN_PWD = '1234'; // ← 修改这里改密码
 const PWD_STORAGE_KEY = 'hsg_admin_auth';
 const PWD_EXPIRE = 8 * 3600 * 1000; // 8小时内免重新输入
 

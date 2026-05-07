@@ -475,23 +475,39 @@ async function geocode(lat, lng) {
   try {
     const ctrl  = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 4000);
+    // zoom=14 获取区级精度
     const r = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=zh-CN&zoom=10`,
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=zh-CN&zoom=14`,
       { headers: { 'Accept-Language': 'zh-CN' }, signal: ctrl.signal }
     );
     clearTimeout(timer);
     const d = await r.json();
     const a = d.address || {};
     const DIRECT = ['北京','上海','天津','重庆'];
-    let prov = (a.province || a.state || '').replace(/省$|自治区$|特别行政区$/, '');
-    let city = (a.city || a.county || a.district || a.town || '').replace(/市$|区$|县$|州$/, '');
+
+    let prov = (a.province || a.state || '').replace(/省$|自治区$|特别行政区$|市$/, '').trim();
+    let city = (a.city || '').replace(/市$/, '').trim();
+    let dist = (a.district || a.county || a.suburb || a.town || '').replace(/区$|县$|镇$|乡$/, '').trim();
+
     let name;
     if (DIRECT.includes(prov)) {
-      const dist = (a.district || a.suburb || '').replace(/区$|县$/, '');
-      name = dist ? prov + dist : prov;
+      // 直辖市：北京+区
+      name = dist ? `${prov}${dist}` : prov;
+    } else if (prov && city && dist) {
+      // 完整三级：省+市+区
+      if (city === dist) {
+        name = `${prov}${city}`;
+      } else {
+        name = `${prov}${city}${dist}`;
+      }
+    } else if (prov && city) {
+      name = `${prov}${city}`;
+    } else if (prov && dist) {
+      name = `${prov}${dist}`;
     } else {
-      name = (prov && city && prov !== city) ? prov + city : (prov || city || null);
+      name = prov || city || dist || null;
     }
+
     if (name) {
       localStorage.setItem(GEO_CACHE_KEY, name);
       localStorage.setItem(GEO_CACHE_TS, String(Date.now()));
@@ -519,6 +535,13 @@ let watchId = null;
 
 async function init() {
   pillLoading();
+  // 清除旧格式缓存（省市两级 → 省市区三级升级）
+  const oldNick = localStorage.getItem(GEO_CACHE_KEY);
+  if (oldNick && oldNick.length <= 6 && !oldNick.includes('玩家')) {
+    // 旧缓存只有省市两级（≤6字），强制重新请求
+    localStorage.removeItem(GEO_CACHE_KEY);
+    localStorage.removeItem(GEO_CACHE_TS);
+  }
 
   if (!navigator.geolocation) {
     pillError('不支持定位');
